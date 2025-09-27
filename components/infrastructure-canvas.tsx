@@ -83,6 +83,8 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedNode, setSelectedNode] = useState<any>(null)
   const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false)
+  const [selectedNodes, setSelectedNodes] = useState<string[]>([])
+  const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const [activeFile, setActiveFile] = useState("main.tf")
   const [terraformFiles, setTerraformFiles] = useState({
     "main.tf": "",
@@ -171,14 +173,14 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
 
       const service = JSON.parse(serviceData)
       
-      // Get the center of the canvas
+      // Get the mouse position relative to the ReactFlow wrapper
       const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect()
-      const centerX = reactFlowBounds.width / 2
-      const centerY = reactFlowBounds.height / 2
+      const mouseX = event.clientX - reactFlowBounds.left
+      const mouseY = event.clientY - reactFlowBounds.top
       
       const position = reactFlowInstance.screenToFlowPosition({
-        x: centerX,
-        y: centerY,
+        x: mouseX,
+        y: mouseY,
       })
 
       const newNode: Node = {
@@ -207,6 +209,23 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     setNodes([])
     setEdges([])
   }
+
+  const deleteSelectedElements = useCallback(() => {
+    if (selectedNodes.length > 0) {
+      setNodes((nds) => nds.filter((node) => !selectedNodes.includes(node.id)))
+      setSelectedNodes([])
+    }
+    
+    if (selectedEdges.length > 0) {
+      setEdges((eds) => eds.filter((edge) => !selectedEdges.includes(edge.id)))
+      setSelectedEdges([])
+    }
+  }, [selectedNodes, selectedEdges])
+
+  const handleSelectionChange = useCallback(({ nodes: selectedNodesArray, edges: selectedEdgesArray }: { nodes: any[], edges: any[] }) => {
+    setSelectedNodes(selectedNodesArray.map(node => node.id))
+    setSelectedEdges(selectedEdgesArray.map(edge => edge.id))
+  }, [])
 
   // Test function to manually create a connection
   const testConnection = () => {
@@ -366,6 +385,21 @@ provider "aws" {
     updateMainTf()
   }, [nodes])
 
+  // Handle keyboard events for delete functionality
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault()
+        deleteSelectedElements()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [deleteSelectedElements])
+
   return (
     <div className="h-screen bg-white flex flex-col">
       {/* Top Header */}
@@ -425,6 +459,21 @@ provider "aws" {
               <div className="text-xs text-gray-500 mb-2">
                 Number of edges: {edges.length}
               </div>
+              {(selectedNodes.length > 0 || selectedEdges.length > 0) && (
+                <div className="mb-2">
+                  <div className="text-xs text-red-600 mb-1">
+                    Selected: {selectedNodes.length} node{selectedNodes.length !== 1 ? 's' : ''}, {selectedEdges.length} edge{selectedEdges.length !== 1 ? 's' : ''}
+                  </div>
+                  <Button 
+                    onClick={deleteSelectedElements}
+                    size="sm"
+                    variant="destructive"
+                    className="w-full text-xs"
+                  >
+                    Delete Selected
+                  </Button>
+                </div>
+              )}
               {nodes.length >= 2 && (
                 <Button 
                   onClick={testConnection}
@@ -458,9 +507,9 @@ provider "aws" {
                   }}
                   onDrop={onDrop}
                   onDragOver={onDragOver}
+                  onSelectionChange={handleSelectionChange}
                   nodeTypes={createNodeTypes(handleNodeDoubleClick)}
                   // edgeTypes={createEdgeTypes()}
-                  fitView
                   className="bg-gray-50"
                   connectionLineStyle={{ stroke: "#666", strokeWidth: 2 }}
                   defaultEdgeOptions={defaultEdgeOptions}

@@ -243,13 +243,13 @@
   stroke: #1d4ed8 !important;
 }
 
-/* Prevent connection handles from moving */
+/* Ensure handles stay in place and are clickable */
 .react-flow__handle {
   position: absolute !important;
-  transform: none !important;
+  pointer-events: all !important;
 }
 
-/* Ensure handles stay in place */
+/* Top and bottom handles */
 .react-flow__handle-top {
   top: -6px !important;
   left: 50% !important;
@@ -262,6 +262,7 @@
   transform: translateX(-50%) !important;
 }
 
+/* Left and right handles */
 .react-flow__handle-left {
   left: -6px !important;
   top: 50% !important;

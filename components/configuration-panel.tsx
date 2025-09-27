@@ -175,23 +175,30 @@ export function ConfigurationPanel({
     )
   }
 
-  const getNodeIcon = (serviceId: string, provider: string) => {
-    switch (serviceId) {
-      case 'lambda':
-        return 'λ'
-      case 'ec2':
-        return '🖥️'
-      case 's3':
-        return '🪣'
-      case 'rds':
-        return '🗄️'
-      case 'vpc':
-        return '🌐'
-      case 'alb':
-        return '⚖️'
-      default:
-        return nodeData.icon
+  const getNodeIconPath = (serviceId: string, provider: string) => {
+    const iconMap: Record<string, string> = {
+      'lambda': '/aws/Arch_AWS-Lambda_64.svg',
+      'ec2': '/aws/Arch_Amazon-EC2_64.svg',
+      's3': '/aws/Arch_Amazon-S3-on-Outposts_64.svg',
+      'rds': '/aws/Arch_Amazon-RDS_64.svg',
+      'alb': '/aws/Arch_Amazon-API-Gateway_64.svg',
+      'dynamodb': '/aws/Arch_Amazon-DynamoDB_64.svg',
+      'cloudwatch': '/aws/Arch_Amazon-CloudWatch_64.svg',
+      'cognito': '/aws/Arch_Amazon-Cognito_64.svg',
+      'documentdb': '/aws/Arch_Amazon-DocumentDB_64.svg',
+      'elasticache': '/aws/Arch_Amazon-ElastiCache_64.svg',
+      'eventbridge': '/aws/Arch_Amazon-EventBridge_64.svg',
+      'memorydb': '/aws/Arch_Amazon-MemoryDB_64.svg',
+      'app-runner': '/aws/Arch_AWS-App-Runner_64.svg',
+      'batch': '/aws/Arch_AWS-Batch_64.svg',
+      'fargate': '/aws/Arch_AWS-Fargate_64.svg',
+      'iam': '/aws/Arch_AWS-IAM-Identity-Center_64.svg',
+      'secrets-manager': '/aws/Arch_AWS-Secrets-Manager_64.svg',
+      'step-functions': '/aws/Arch_AWS-Step-Functions_64.svg',
+      'x-ray': '/aws/Arch_AWS-X-Ray_64.svg'
     }
+
+    return iconMap[serviceId] || '/aws/Arch_Amazon-EC2_64.svg' // fallback to EC2 icon
   }
 
   const getNodeColor = (serviceId: string, provider: string) => {
@@ -231,10 +238,12 @@ export function ConfigurationPanel({
 
         {/* Node Title */}
         <div className="flex items-center gap-3 mb-4">
-          <div className={`w-8 h-8 ${getNodeColor(nodeData.id, nodeData.provider)} rounded-lg flex items-center justify-center shadow-sm`}>
-            <span className="text-white text-sm font-bold">
-              {getNodeIcon(nodeData.id, nodeData.provider)}
-            </span>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm bg-white border border-gray-200">
+            <img 
+              src={getNodeIconPath(nodeData.id, nodeData.provider)} 
+              alt={`${nodeData.id} icon`}
+              className="w-6 h-6"
+            />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-sm text-gray-900 truncate">{nodeData.name}</h3>
