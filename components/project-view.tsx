@@ -99,10 +99,7 @@ export function ProjectView({ project, onBack, onUpdateProject }: ProjectViewPro
                   Change Provider
                 </Button>
               )}
-              <Button variant="ghost" size="sm" className="hover:bg-accent">
-                <Share className="w-4 h-4 mr-2" />
-                Share
-              </Button>
+
               <Button variant="ghost" size="sm" className="hover:bg-accent">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings

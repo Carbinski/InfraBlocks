@@ -21,6 +21,7 @@ export function ProviderSelection({ onProviderSelect }: ProviderSelectionProps) 
       description: "Build on the world's most comprehensive cloud platform",
       logo: FaAws,
       color: "#FF9900",
+      available: true,
     },
     {
       id: "gcp" as const,
@@ -28,6 +29,7 @@ export function ProviderSelection({ onProviderSelect }: ProviderSelectionProps) 
       description: "Transform your business with Google's proven technology",
       logo: SiGooglecloud,
       color: "#4285F4",
+      available: false,
     },
     {
       id: "azure" as const,
@@ -35,6 +37,7 @@ export function ProviderSelection({ onProviderSelect }: ProviderSelectionProps) 
       description: "Invent with purpose on a trusted cloud platform",
       logo: VscAzure,
       color: "#0078D4",
+      available: false,
     },
   ]
 
@@ -51,8 +54,12 @@ export function ProviderSelection({ onProviderSelect }: ProviderSelectionProps) 
         {providers.map((provider) => (
           <Card
             key={provider.id}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => onProviderSelect(provider.id)}
+            className={`transition-shadow ${
+              provider.available 
+                ? "cursor-pointer hover:shadow-md" 
+                : "cursor-not-allowed opacity-60"
+            }`}
+            onClick={() => provider.available && onProviderSelect(provider.id)}
           >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -66,35 +73,18 @@ export function ProviderSelection({ onProviderSelect }: ProviderSelectionProps) 
               </div>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" className="w-full">
-                Get Started
+              <Button 
+                variant="outline" 
+                className="w-full"
+                disabled={!provider.available}
+              >
+                {provider.available ? "Get Started" : "Coming Soon"}
               </Button>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="mt-12 p-6 bg-muted/30 rounded-lg">
-        <h3 className="text-lg font-semibold mb-4 text-center">Platform Features</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-2xl mx-auto">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">50+</div>
-            <div className="text-sm text-muted-foreground">Cloud Services</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">100%</div>
-            <div className="text-sm text-muted-foreground">Terraform Compatible</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">5min</div>
-            <div className="text-sm text-muted-foreground">Average Deploy Time</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">99.9%</div>
-            <div className="text-sm text-muted-foreground">Uptime SLA</div>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
