@@ -2,15 +2,15 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Copy, Download, CheckCircle } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import type { Edge, Node } from "@xyflow/react"
+import { CheckCircle, Copy, Download } from "lucide-react"
+import { useState } from "react"
 import { TerraformGenerator } from "./terraform-generator"
-import type { Node, Edge } from "@xyflow/react"
 
 interface TerraformExportDialogProps {
   provider: string
@@ -52,7 +52,7 @@ export function TerraformExportDialog({ provider, nodes, edges, children }: Terr
   const getResourceCount = () => {
     const counts: Record<string, number> = {}
     nodes.forEach((node) => {
-      const category = node.data.category
+      const category = node.data.category as string
       counts[category] = (counts[category] || 0) + 1
     })
     return counts

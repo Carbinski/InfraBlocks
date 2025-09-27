@@ -1,7 +1,11 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FaAws } from "react-icons/fa";
+import { SiGooglecloud } from "react-icons/si";
+import { VscAzure } from "react-icons/vsc";
+
 
 type CloudProvider = "aws" | "gcp" | "azure"
 
@@ -15,19 +19,22 @@ export function ProviderSelection({ onProviderSelect }: ProviderSelectionProps) 
       id: "aws" as const,
       name: "Amazon Web Services",
       description: "Build on the world's most comprehensive cloud platform",
-      logo: "🟠", // AWS orange placeholder
+      logo: FaAws,
+      color: "#FF9900",
     },
     {
       id: "gcp" as const,
       name: "Google Cloud Platform",
       description: "Transform your business with Google's proven technology",
-      logo: "🔵", // GCP blue placeholder
+      logo: SiGooglecloud,
+      color: "#4285F4",
     },
     {
       id: "azure" as const,
       name: "Microsoft Azure",
       description: "Invent with purpose on a trusted cloud platform",
-      logo: "🔷", // Azure blue placeholder
+      logo: VscAzure,
+      color: "#0078D4",
     },
   ]
 
@@ -36,7 +43,7 @@ export function ProviderSelection({ onProviderSelect }: ProviderSelectionProps) 
       <div className="text-center space-y-4">
         <h2 className="text-3xl font-bold">Choose Your Cloud Provider</h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Select the cloud platform you want to design your infrastructure for. You can change this later if needed.
+          Select the cloud platform you want to design your infrastructure for.
         </p>
       </div>
 
@@ -50,7 +57,9 @@ export function ProviderSelection({ onProviderSelect }: ProviderSelectionProps) 
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="text-4xl mb-3">{provider.logo}</div>
+                  <div className="mb-3">
+                    <provider.logo size={48} color={provider.color} />
+                  </div>
                   <CardTitle className="text-base">{provider.name}</CardTitle>
                   <CardDescription className="mt-1">{provider.description}</CardDescription>
                 </div>

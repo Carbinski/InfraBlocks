@@ -1,4 +1,4 @@
-import type { Node, Edge } from "@xyflow/react"
+import type { Edge, Node } from "@xyflow/react"
 
 export interface TerraformResource {
   type: string
@@ -44,8 +44,8 @@ export class TerraformGenerator {
       const config = this.generateResourceConfig(node)
 
       return {
-        type: node.data.terraformType,
-        name: this.sanitizeName(node.data.name || node.data.id),
+        type: node.data.terraformType as string,
+        name: this.sanitizeName((node.data.name as string) || (node.data.id as string)),
         config,
         dependencies,
       }
@@ -53,8 +53,8 @@ export class TerraformGenerator {
   }
 
   private generateResourceConfig(node: Node): Record<string, any> {
-    const baseConfig = { ...node.data.config }
-    const serviceId = node.data.id
+    const baseConfig = { ...(node.data.config as Record<string, any>) }
+    const serviceId = node.data.id as string
 
     // Apply provider-specific configurations
     switch (this.provider) {
@@ -88,7 +88,7 @@ export class TerraformGenerator {
 
       case "s3":
         return {
-          bucket: config.bucket_name || `${this.sanitizeName(node.data.name)}-bucket-${Date.now()}`,
+          bucket: config.bucket_name || `${this.sanitizeName(node.data.name as string)}-bucket-${Date.now()}`,
           versioning: {
             enabled: config.versioning === "Enabled",
           },
@@ -106,7 +106,7 @@ export class TerraformGenerator {
 
       case "rds":
         return {
-          identifier: config.db_name || `${this.sanitizeName(node.data.name)}-db`,
+          identifier: config.db_name || `${this.sanitizeName(node.data.name as string)}-db`,
           engine: config.engine || "mysql",
           engine_version: this.getEngineVersion(config.engine || "mysql"),
           instance_class: config.instance_class || "db.t3.micro",
@@ -125,7 +125,7 @@ export class TerraformGenerator {
 
       case "lambda":
         return {
-          function_name: config.function_name || `${this.sanitizeName(node.data.name)}-function`,
+          function_name: config.function_name || `${this.sanitizeName(node.data.name as string)}-function`,
           runtime: config.runtime || "nodejs18.x",
           handler: "index.handler",
           filename: "lambda_function.zip",
@@ -151,10 +151,10 @@ export class TerraformGenerator {
 
       case "alb":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name)}-alb`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-alb`,
           load_balancer_type: config.load_balancer_type || "application",
           scheme: config.scheme || "internet-facing",
-          subnets: this.getSubnetReferences(node.id),
+          subnets: [this.getSubnetReference(node.id)],
           security_groups: this.getSecurityGroupReferences(node.id),
           tags: {
             Name: config.name || node.data.name,
@@ -171,7 +171,7 @@ export class TerraformGenerator {
     switch (serviceId) {
       case "compute":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name)}-instance`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-instance`,
           machine_type: config.machine_type || "e2-micro",
           zone: config.zone || "us-central1-a",
           boot_disk: {
@@ -190,7 +190,7 @@ export class TerraformGenerator {
 
       case "storage":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name)}-bucket`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-bucket`,
           location: config.location || "US",
           storage_class: config.storage_class || "STANDARD",
           labels: {
@@ -200,7 +200,7 @@ export class TerraformGenerator {
 
       case "sql":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name)}-db`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-db`,
           database_version: config.database_version || "MYSQL_8_0",
           tier: config.tier || "db-f1-micro",
           settings: {
@@ -218,7 +218,7 @@ export class TerraformGenerator {
     switch (serviceId) {
       case "vm":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name)}-vm`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-vm`,
           resource_group_name: "azurerm_resource_group.main.name",
           location: config.location || "East US",
           size: config.vm_size || "Standard_B1s",
@@ -242,7 +242,7 @@ export class TerraformGenerator {
 
       case "blob":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name)}storage`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}storage`,
           resource_group_name: "azurerm_resource_group.main.name",
           location: config.location || "East US",
           account_tier: config.account_tier || "Standard",
@@ -265,7 +265,7 @@ export class TerraformGenerator {
         const sourceNode = this.nodes.find((n) => n.id === edge.source)
         if (sourceNode) {
           dependencies.push(
-            `${sourceNode.data.terraformType}.${this.sanitizeName(sourceNode.data.name || sourceNode.data.id)}`,
+            `${sourceNode.data.terraformType as string}.${this.sanitizeName((sourceNode.data.name as string) || (sourceNode.data.id as string))}`,
           )
         }
       }
@@ -306,15 +306,15 @@ export class TerraformGenerator {
     const outputs: Record<string, any> = {}
 
     this.nodes.forEach((node) => {
-      const resourceName = this.sanitizeName(node.data.name || node.data.id)
-      const resourceType = node.data.terraformType
+      const resourceName = this.sanitizeName((node.data.name as string) || (node.data.id as string))
+      const resourceType = node.data.terraformType as string
 
       switch (node.data.id) {
         case "ec2":
         case "compute":
         case "vm":
           outputs[`${resourceName}_public_ip`] = {
-            description: `Public IP of ${node.data.name}`,
+            description: `Public IP of ${node.data.name as string}`,
             value: `${resourceType}.${resourceName}.public_ip`,
           }
           break
@@ -323,7 +323,7 @@ export class TerraformGenerator {
         case "storage":
         case "blob":
           outputs[`${resourceName}_bucket_name`] = {
-            description: `Name of ${node.data.name} bucket`,
+            description: `Name of ${node.data.name as string} bucket`,
             value: `${resourceType}.${resourceName}.bucket`,
           }
           break
@@ -331,7 +331,7 @@ export class TerraformGenerator {
         case "rds":
         case "sql":
           outputs[`${resourceName}_endpoint`] = {
-            description: `Database endpoint for ${node.data.name}`,
+            description: `Database endpoint for ${node.data.name as string}`,
             value: `${resourceType}.${resourceName}.endpoint`,
           }
           break
@@ -339,7 +339,7 @@ export class TerraformGenerator {
         case "alb":
         case "lb":
           outputs[`${resourceName}_dns_name`] = {
-            description: `DNS name of ${node.data.name}`,
+            description: `DNS name of ${node.data.name as string}`,
             value: `${resourceType}.${resourceName}.dns_name`,
           }
           break
