@@ -1,0 +1,64 @@
+{
+  "id": "kinesis",
+  "name": "Kinesis",
+  "icon": "📊",
+  "category": "Analytics",
+  "description": "Real-time data streaming service",
+  "terraformType": "aws_kinesis_stream",
+  "defaultConfig": {
+    "shard_count": 1,
+    "retention_period": 24,
+    "encryption_type": "NONE"
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "Stream Name",
+      "description": "The name of the Kinesis stream",
+      "required": true,
+      "validation": {
+        "pattern": "^[a-zA-Z0-9_.-]+$"
+      }
+    },
+    "shard_count": {
+      "type": "number",
+      "label": "Shard Count",
+      "description": "Number of shards for the stream",
+      "default": 1,
+      "required": true,
+      "validation": {
+        "min": 1,
+        "max": 1000
+      }
+    },
+    "retention_period": {
+      "type": "number",
+      "label": "Retention Period (hours)",
+      "description": "Data retention period in hours",
+      "default": 24,
+      "validation": {
+        "min": 24,
+        "max": 8760
+      }
+    },
+    "encryption_type": {
+      "type": "select",
+      "label": "Encryption Type",
+      "description": "Encryption type for the stream",
+      "options": ["NONE", "KMS"],
+      "default": "NONE"
+    },
+    "kms_key_id": {
+      "type": "string",
+      "label": "KMS Key ID",
+      "description": "KMS key ID for encryption (required if encryption_type is KMS)",
+      "required": false
+    },
+    "tags": {
+      "type": "string",
+      "label": "Tags",
+      "description": "JSON string of tags to apply",
+      "required": false
+    }
+  }
+}

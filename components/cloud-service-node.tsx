@@ -62,6 +62,10 @@ export const CloudServiceNode = memo(({ data, selected, onDoubleClick }: CloudSe
         return '🗄️'
       case 'vpc':
         return '🌐'
+      case 'kinesis':
+        return '📊'
+      case 'sqs':
+        return '📬'
       case 'alb':
         return '⚖️'
       default:

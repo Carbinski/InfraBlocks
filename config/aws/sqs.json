@@ -1,0 +1,100 @@
+{
+  "id": "sqs",
+  "name": "SQS",
+  "icon": "📬",
+  "category": "Application Integration",
+  "description": "Simple queue service for message queuing",
+  "terraformType": "aws_sqs_queue",
+  "defaultConfig": {
+    "visibility_timeout_seconds": 30,
+    "message_retention_seconds": 1209600,
+    "max_message_size": 262144,
+    "delay_seconds": 0,
+    "receive_wait_time_seconds": 0
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "Queue Name",
+      "description": "The name of the SQS queue",
+      "required": true,
+      "validation": {
+        "pattern": "^[a-zA-Z0-9_-]+$"
+      }
+    },
+    "visibility_timeout_seconds": {
+      "type": "number",
+      "label": "Visibility Timeout (seconds)",
+      "description": "The visibility timeout for the queue",
+      "default": 30,
+      "validation": {
+        "min": 0,
+        "max": 43200
+      }
+    },
+    "message_retention_seconds": {
+      "type": "number",
+      "label": "Message Retention (seconds)",
+      "description": "The number of seconds to retain messages",
+      "default": 1209600,
+      "validation": {
+        "min": 60,
+        "max": 1209600
+      }
+    },
+    "max_message_size": {
+      "type": "number",
+      "label": "Max Message Size (bytes)",
+      "description": "The maximum message size in bytes",
+      "default": 262144,
+      "validation": {
+        "min": 1024,
+        "max": 262144
+      }
+    },
+    "delay_seconds": {
+      "type": "number",
+      "label": "Delay Seconds",
+      "description": "The time in seconds to delay message delivery",
+      "default": 0,
+      "validation": {
+        "min": 0,
+        "max": 900
+      }
+    },
+    "receive_wait_time_seconds": {
+      "type": "number",
+      "label": "Receive Wait Time (seconds)",
+      "description": "The time to wait for messages (0 for short polling, >0 for long polling)",
+      "default": 0,
+      "validation": {
+        "min": 0,
+        "max": 20
+      }
+    },
+    "fifo_queue": {
+      "type": "boolean",
+      "label": "FIFO Queue",
+      "description": "Enable FIFO (First-In-First-Out) queue",
+      "default": false
+    },
+    "content_based_deduplication": {
+      "type": "boolean",
+      "label": "Content-Based Deduplication",
+      "description": "Enable content-based deduplication for FIFO queues",
+      "default": false
+    },
+    "dead_letter_queue": {
+      "type": "string",
+      "label": "Dead Letter Queue ARN",
+      "description": "ARN of the dead letter queue (optional)",
+      "required": false
+    },
+    "tags": {
+      "type": "string",
+      "label": "Tags",
+      "description": "JSON string of tags to apply",
+      "required": false
+    }
+  }
+}
