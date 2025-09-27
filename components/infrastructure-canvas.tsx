@@ -559,7 +559,7 @@ provider "aws" {
                 <div className="flex items-center gap-2">
                   <Code className="w-4 h-4" />
                   <Select value={activeFile} onValueChange={handleFileChange}>
-                    <SelectTrigger className="w-32 bg-gray-100 border-gray-300 text-gray-900">
+                    <SelectTrigger className="w-44 bg-gray-100 border-gray-300 text-gray-900">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-100 border-gray-300">
@@ -573,9 +573,6 @@ provider "aws" {
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Download className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                    <Pin className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Play className="w-4 h-4" />
