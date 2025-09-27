@@ -166,19 +166,7 @@ export function Dashboard() {
 
     
 
-
-        {/* User Info */}
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-              <Shield className="w-4 h-4 text-yellow-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-gray-900">Lalit Yadav</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col relative z-0">
