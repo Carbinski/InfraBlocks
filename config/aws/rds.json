@@ -1,0 +1,79 @@
+{
+  "id": "rds",
+  "name": "RDS",
+  "icon": "/aws/Arch_Amazon-RDS_64.svg",
+  "category": "Database",
+  "description": "Managed relational database",
+  "terraformType": "aws_db_instance",
+  "defaultConfig": {
+    "engine": "mysql",
+    "instance_class": "db.t3.micro",
+    "allocated_storage": 20,
+    "db_name": "mydb",
+    "username": "admin"
+  },
+  "configSchema": {
+    "engine": {
+      "type": "select",
+      "label": "Database Engine",
+      "description": "The database engine to use",
+      "options": ["mysql", "postgres", "mariadb", "oracle-ee", "sqlserver-ex", "sqlserver-se", "sqlserver-web"],
+      "default": "mysql",
+      "required": true
+    },
+    "instance_class": {
+      "type": "select",
+      "label": "Instance Class",
+      "description": "The RDS instance class",
+      "options": ["db.t3.micro", "db.t3.small", "db.t3.medium", "db.t3.large", "db.t3.xlarge", "db.r5.large"],
+      "default": "db.t3.micro",
+      "required": true
+    },
+    "allocated_storage": {
+      "type": "number",
+      "label": "Storage (GB)",
+      "description": "The allocated storage size in gigabytes",
+      "default": 20,
+      "required": true,
+      "validation": {
+        "min": 20,
+        "max": 65536
+      }
+    },
+    "db_name": {
+      "type": "string",
+      "label": "Database Name",
+      "description": "The name of the database to create",
+      "required": true
+    },
+    "username": {
+      "type": "string",
+      "label": "Master Username",
+      "description": "The master username for the database",
+      "default": "admin",
+      "required": true
+    },
+    "password": {
+      "type": "string",
+      "label": "Master Password",
+      "description": "The master password for the database",
+      "required": true
+    },
+    "backup_retention_period": {
+      "type": "number",
+      "label": "Backup Retention (days)",
+      "description": "The number of days to retain automated backups",
+      "default": 7,
+      "validation": {
+        "min": 0,
+        "max": 35
+      }
+    },
+    "multi_az": {
+      "type": "boolean",
+      "label": "Multi-AZ Deployment",
+      "description": "Enable Multi-AZ deployment for high availability",
+      "default": false
+    }
+  }
+}

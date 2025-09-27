@@ -1,0 +1,61 @@
+{
+  "id": "s3",
+  "name": "S3",
+  "icon": "/aws/Arch_Amazon-S3-on-Outposts_64.svg",
+  "category": "Storage",
+  "description": "Object storage service",
+  "terraformType": "aws_s3_bucket",
+  "defaultConfig": {
+    "bucket_name": "",
+    "versioning": "Disabled",
+    "public_access": "Blocked",
+    "encryption": "AES256"
+  },
+  "configSchema": {
+    "bucket_name": {
+      "type": "string",
+      "label": "Bucket Name",
+      "description": "The name of the S3 bucket (must be globally unique)",
+      "required": true,
+      "validation": {
+        "pattern": "^[a-z0-9.-]*$"
+      }
+    },
+    "versioning": {
+      "type": "select",
+      "label": "Versioning",
+      "description": "Enable versioning for the bucket",
+      "options": ["Enabled", "Disabled", "Suspended"],
+      "default": "Disabled",
+      "required": true
+    },
+    "public_access": {
+      "type": "select",
+      "label": "Public Access",
+      "description": "Public access settings for the bucket",
+      "options": ["Blocked", "Allowed"],
+      "default": "Blocked",
+      "required": true
+    },
+    "encryption": {
+      "type": "select",
+      "label": "Encryption",
+      "description": "Server-side encryption for the bucket",
+      "options": ["AES256", "aws:kms"],
+      "default": "AES256",
+      "required": true
+    },
+    "lifecycle_rule": {
+      "type": "boolean",
+      "label": "Enable Lifecycle Rules",
+      "description": "Enable lifecycle management for the bucket",
+      "default": false
+    },
+    "cors_enabled": {
+      "type": "boolean",
+      "label": "Enable CORS",
+      "description": "Enable Cross-Origin Resource Sharing",
+      "default": false
+    }
+  }
+}

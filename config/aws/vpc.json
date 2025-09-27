@@ -1,0 +1,50 @@
+{
+  "id": "vpc",
+  "name": "VPC",
+  "icon": "🌐",
+  "category": "Network",
+  "description": "Virtual private cloud",
+  "terraformType": "aws_vpc",
+  "defaultConfig": {
+    "cidr_block": "10.0.0.0/16",
+    "enable_dns_hostnames": true,
+    "enable_dns_support": true
+  },
+  "configSchema": {
+    "cidr_block": {
+      "type": "string",
+      "label": "CIDR Block",
+      "description": "The CIDR block for the VPC",
+      "default": "10.0.0.0/16",
+      "required": true,
+      "validation": {
+        "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+      }
+    },
+    "enable_dns_hostnames": {
+      "type": "boolean",
+      "label": "Enable DNS Hostnames",
+      "description": "Enable DNS hostnames for the VPC",
+      "default": true
+    },
+    "enable_dns_support": {
+      "type": "boolean",
+      "label": "Enable DNS Support",
+      "description": "Enable DNS support for the VPC",
+      "default": true
+    },
+    "instance_tenancy": {
+      "type": "select",
+      "label": "Instance Tenancy",
+      "description": "The tenancy of the VPC",
+      "options": ["default", "dedicated"],
+      "default": "default"
+    },
+    "tags": {
+      "type": "string",
+      "label": "Tags",
+      "description": "JSON string of tags to apply",
+      "required": false
+    }
+  }
+}

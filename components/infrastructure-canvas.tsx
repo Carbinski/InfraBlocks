@@ -1,9 +1,14 @@
 "use client"
 
-type CloudProvider = "aws" | "gcp" | "azure"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select"
+import { InfrastructureCanvasProps } from "@/types"
 import {
   addEdge,
   Background,
@@ -13,6 +18,8 @@ import {
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
+  type Connection,
+  type Edge,
   type Node,
   type OnConnect,
   type ReactFlowInstance,
@@ -20,47 +27,35 @@ import {
 import "@xyflow/react/dist/style.css"
 import {
   ArrowLeft,
-  Brain,
-  ChevronDown,
   Code,
-  Diamond,
   Download,
-  FileText,
-  Grid3X3,
-  History,
-  Image,
-  Import,
-  Layers,
-  Maximize2,
-  Pencil,
   Pin,
-  Play,
-  Redo,
-  Search,
-  Shapes,
-  Square,
-  Undo,
-  Users,
-  ZoomIn,
-  ZoomOut
+  Play
 } from "lucide-react"
-import { useCallback, useRef, useState, type DragEvent } from "react"
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { CloudServiceNode } from "./cloud-service-node"
-import { ConnectionEdge } from "./connection-edge"
+import { ConfigurationPanel } from "./configuration-panel"
 import { getConnectionSuggestions, validateConnection } from "./connection-validator"
 import { serviceDefinitions } from "./service-definitions"
 
-interface InfrastructureCanvasProps {
-  provider: CloudProvider
-  onBack: () => void
+
+const createNodeTypes = (onNodeDoubleClick: (nodeData: any) => void) => ({
+  cloudService: (props: any) => <CloudServiceNode {...props} onDoubleClick={onNodeDoubleClick} />,
+})
+
+const createEdgeTypes = () => {
+  console.log('Creating edge types - using default edges for now')
+  return {
+    // Temporarily removing custom edge to test
+    // custom: ConnectionEdge,
+  }
 }
 
-const nodeTypes = {
-  cloudService: CloudServiceNode,
-}
-
-const edgeTypes = {
-  connection: ConnectionEdge,
+// Use smoothstep edge type for testing
+const defaultEdgeOptions = {
+  style: { strokeWidth: 3, stroke: '#ef4444' },
+  type: 'smoothstep',
+  animated: false,
 }
 
 let nodeId = 0
@@ -69,8 +64,32 @@ const getId = () => `node_${nodeId++}`
 export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([])
+
+  // Debug: Log edges changes
+  useEffect(() => {
+    console.log('Edges updated:', edges)
+    console.log('Edges length:', edges.length)
+    if (edges.length > 0) {
+      console.log('First edge details:', edges[0])
+    }
+  }, [edges])
+
+  // Debug: Log nodes changes
+  useEffect(() => {
+    console.log('Nodes updated:', nodes)
+    console.log('Nodes length:', nodes.length)
+  }, [nodes])
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedNode, setSelectedNode] = useState<any>(null)
+  const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false)
+  const [activeFile, setActiveFile] = useState("main.tf")
+  const [terraformFiles, setTerraformFiles] = useState({
+    "main.tf": "",
+    "variables.tf": "",
+    "outputs.tf": "",
+    "providers.tf": ""
+  })
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
 
   const providerConfig = {
@@ -93,33 +112,44 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const categories = [...new Set(services.map((s) => s.category))]
 
   const onConnect: OnConnect = useCallback(
-    (connection) => {
-      const sourceNode = nodes.find((n) => n.id === connection.source)
-      const targetNode = nodes.find((n) => n.id === connection.target)
+    (params: Connection | Edge) => {
+      console.log('onConnect called with params:', params)
+      
+      const sourceNode = nodes.find((n) => n.id === params.source)
+      const targetNode = nodes.find((n) => n.id === params.target)
 
-      if (!sourceNode || !targetNode) return
+      if (!sourceNode || !targetNode) {
+        console.log('Source or target node not found')
+        return
+      }
 
       const sourceType = (sourceNode.data as any).id
       const targetType = (targetNode.data as any).id
 
+      console.log('Connecting:', sourceType, 'to', targetType)
+
       // Validate the connection
       const rule = validateConnection(sourceType, targetType, provider)
-
-      if (rule) {
-        const newEdge = {
-          ...connection,
-          type: "connection",
-          data: {
-            relationship: rule.relationship,
-            description: rule.description,
-            bidirectional: rule.bidirectional,
-          },
-        }
-        setEdges((eds) => addEdge(newEdge, eds))
-      } else {
-        // Show warning or prevent invalid connection
-        console.warn(`Invalid connection between ${sourceType} and ${targetType}`)
+      
+      const newEdge = {
+        ...params,
+        type: 'smoothstep',
+        animated: false,
+        style: { strokeWidth: 4, stroke: '#10b981' }, // Green color
+        data: {
+          relationship: rule?.relationship || "connects_to",
+          description: rule?.description || "Manual connection",
+          bidirectional: rule?.bidirectional || false,
+        },
       }
+      
+      console.log('Creating new edge:', newEdge)
+      
+      setEdges((eds) => {
+        const updatedEdges = addEdge(newEdge, eds)
+        console.log('Updated edges:', updatedEdges)
+        return updatedEdges
+      })
     },
     [nodes, setEdges, provider],
   )
@@ -135,15 +165,20 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
 
       if (!reactFlowWrapper.current || !reactFlowInstance) return
 
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect()
       const serviceData = event.dataTransfer.getData("application/reactflow")
 
       if (!serviceData) return
 
       const service = JSON.parse(serviceData)
+      
+      // Get the center of the canvas
+      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect()
+      const centerX = reactFlowBounds.width / 2
+      const centerY = reactFlowBounds.height / 2
+      
       const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+        x: centerX,
+        y: centerY,
       })
 
       const newNode: Node = {
@@ -173,7 +208,56 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     setEdges([])
   }
 
+  // Test function to manually create a connection
+  const testConnection = () => {
+    if (nodes.length >= 2) {
+      const testEdge = {
+        id: `test-${Date.now()}`,
+        source: nodes[0].id,
+        target: nodes[1].id,
+        type: 'smoothstep',
+        animated: false,
+        style: { stroke: '#ff0000', strokeWidth: 5 },
+        data: {
+          relationship: "test_connection",
+          description: "Test connection",
+          bidirectional: false,
+        },
+      }
+      console.log('Creating test connection:', testEdge)
+      console.log('Current nodes:', nodes)
+      console.log('Current edges before:', edges)
+      setEdges((eds) => {
+        const newEdges = addEdge(testEdge, eds)
+        console.log('New edges after adding:', newEdges)
+        return newEdges
+      })
+    }
+  }
+
   const suggestions = getConnectionSuggestions(nodes, provider!)
+
+  const handleNodeDoubleClick = (nodeData: any) => {
+    setSelectedNode(nodeData)
+    setIsConfigPanelOpen(true)
+  }
+
+  const handleConfigUpdate = (config: Record<string, any>) => {
+    if (selectedNode) {
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === selectedNode.id
+            ? { ...node, data: { ...node.data, config } }
+            : node
+        )
+      )
+    }
+  }
+
+  const handleCloseConfigPanel = () => {
+    setIsConfigPanelOpen(false)
+    setSelectedNode(null)
+  }
 
   // Generate Terraform code from nodes
   const generateTerraformCode = () => {
@@ -203,6 +287,85 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     return terraformCode
   }
 
+  // Initialize Terraform files with default content
+  const initializeTerraformFiles = () => {
+    const mainTf = generateTerraformCode()
+    const variablesTf = `# Variables for your infrastructure
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+`
+
+    const outputsTf = `# Outputs for your infrastructure
+output "resources_created" {
+  description = "Number of resources created"
+  value       = ${nodes.length}
+}
+`
+
+    const providersTf = `# Provider configuration
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+}
+`
+
+    setTerraformFiles({
+      "main.tf": mainTf,
+      "variables.tf": variablesTf,
+      "outputs.tf": outputsTf,
+      "providers.tf": providersTf
+    })
+  }
+
+  // Handle file content changes
+  const handleFileContentChange = (content: string) => {
+    setTerraformFiles(prev => ({
+      ...prev,
+      [activeFile]: content
+    }))
+  }
+
+  // Handle file switching
+  const handleFileChange = (fileName: string) => {
+    setActiveFile(fileName)
+  }
+
+  // Update main.tf when nodes change
+  const updateMainTf = () => {
+    const newMainTf = generateTerraformCode()
+    setTerraformFiles(prev => ({
+      ...prev,
+      "main.tf": newMainTf
+    }))
+  }
+
+  // Initialize files on component mount
+  useEffect(() => {
+    initializeTerraformFiles()
+  }, [])
+
+  // Update main.tf when nodes change
+  useEffect(() => {
+    updateMainTf()
+  }, [nodes])
+
   return (
     <div className="h-screen bg-white flex flex-col">
       {/* Top Header */}
@@ -217,8 +380,6 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
               <span className="text-white text-xs font-bold">A</span>
             </div>
             <span className="text-sm font-medium text-gray-600">aws</span>
-            <span className="text-sm text-gray-400">•</span>
-            <span className="text-sm font-medium text-gray-600">5.100.0</span>
           </div>
         </div>
       </header>
@@ -227,123 +388,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
         {/* Left Sidebar */}
         <aside className="w-80 border-r border-gray-200 bg-white overflow-y-auto">
           <div className="p-4 space-y-4">
-            {/* Provider and Version */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-2 bg-orange-100 rounded-lg">
-                <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                <span className="text-sm font-medium">aws</span>
-                <ChevronDown className="w-3 h-3" />
-              </div>
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
-                <span className="text-sm font-medium">5.100.0</span>
-                <ChevronDown className="w-3 h-3" />
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-6 h-6 bg-purple-500 rounded flex items-center justify-center">
-                  <img src="/Arch_AWS-EC2_64.svg" alt="EC2" className="w-3 h-3" />
-                </div>
-                <div className="w-6 h-6 bg-gray-300 rounded flex items-center justify-center">
-                  <img src="/Arch_AWS-Lambda_64.svg" alt="Lambda" className="w-3 h-3" />
-                </div>
-              </div>
-            </div>
-
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input 
-                placeholder="Search TF resources" 
-                className="pl-10 border-gray-200 focus:border-purple-500 focus:ring-purple-500"
-              />
-            </div>
-
-            {/* TF Resources Tabs */}
-            <Tabs defaultValue="variables" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-100">
-                <TabsTrigger value="variables" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Variables</TabsTrigger>
-                <TabsTrigger value="locals" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Locals</TabsTrigger>
-                <TabsTrigger value="outputs" className="data-[state=active]:bg-white data-[state=active]:text-purple-600">Outputs</TabsTrigger>
-              </TabsList>
-              <TabsContent value="variables" className="mt-2">
-                <div className="text-sm text-gray-500">No variables defined</div>
-              </TabsContent>
-              <TabsContent value="locals" className="mt-2">
-                <div className="text-sm text-gray-500">No locals defined</div>
-              </TabsContent>
-              <TabsContent value="outputs" className="mt-2">
-                <div className="text-sm text-gray-500">No outputs defined</div>
-              </TabsContent>
-            </Tabs>
-
-            {/* Modules */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Diamond className="w-4 h-4 text-purple-600" />
-                  <span className="font-medium text-gray-900">Modules</span>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 border-gray-200 text-gray-600 hover:bg-gray-50">
-                  <Import className="w-3 h-3 mr-1" />
-                  Import
-                </Button>
-                <Button size="sm" className="flex-1 bg-purple-600 hover:bg-purple-700 text-white">
-                  <Grid3X3 className="w-3 h-3 mr-1" />
-                  Catalog
-                </Button>
-              </div>
-            </div>
-
-            {/* Design */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Pencil className="w-4 h-4 text-purple-600" />
-                  <span className="font-medium text-gray-900">Design</span>
-                </div>
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Button variant="outline" size="sm" className="aspect-square p-0 border-gray-200 hover:bg-purple-50 hover:border-purple-200">
-                  <Image className="w-4 h-4 text-purple-600" />
-                </Button>
-                <Button variant="outline" size="sm" className="aspect-square p-0 border-gray-200 hover:bg-purple-50 hover:border-purple-200">
-                  <Square className="w-4 h-4 text-purple-600" />
-                </Button>
-                <Button variant="outline" size="sm" className="aspect-square p-0 border-gray-200 hover:bg-purple-50 hover:border-purple-200">
-                  <Layers className="w-4 h-4 text-purple-600" />
-                </Button>
-                <Button variant="outline" size="sm" className="aspect-square p-0 border-gray-200 hover:bg-purple-50 hover:border-purple-200">
-                  <Brain className="w-4 h-4 text-purple-600" />
-                </Button>
-                <Button variant="outline" size="sm" className="aspect-square p-0 border-gray-200 hover:bg-purple-50 hover:border-purple-200">
-                  <Shapes className="w-4 h-4 text-purple-600" />
-                </Button>
-                <Button variant="outline" size="sm" className="aspect-square p-0 border-gray-200 hover:bg-purple-50 hover:border-purple-200">
-                  <Shapes className="w-4 h-4 text-purple-600" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Containers */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">Containers</span>
-                </div>
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 p-2 hover:bg-purple-50 rounded">
-                  <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
-                    <Users className="w-3 h-3 text-purple-600" />
-                  </div>
-                  <span className="text-sm text-gray-700">Availability Zone</span>
-                </div>
-              </div>
-            </div>
-
+            
             {/* Cloud Services */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -351,69 +396,51 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
                   <span className="font-medium text-gray-900">Cloud Services</span>
                 </div>
               </div>
-              <div className="space-y-2">
-                {services.slice(0, 6).map((service) => (
+              <div className="grid grid-cols-3 gap-2">
+                {services.slice(0, 12).map((service) => (
                   <div
                     key={service.id}
-                    className="flex items-center gap-2 p-2 hover:bg-purple-50 rounded cursor-grab active:cursor-grabbing border border-gray-200 hover:border-purple-200"
+                    className="flex flex-col items-center p-2 hover:bg-purple-50 rounded cursor-grab active:cursor-grabbing border border-gray-200 hover:border-purple-200 transition-colors"
                     draggable
                     onDragStart={(event) => onDragStart(event, service)}
                   >
-                    <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center text-white text-xs font-bold">
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm mb-1">
                       {service.icon.startsWith('/') ? (
-                        <img src={service.icon} alt={service.name} className="w-4 h-4" />
+                        <img src={service.icon} alt={service.name} className="w-6 h-6" />
                       ) : (
-                        service.icon
+                        <span className="text-lg">{service.icon}</span>
                       )}
                     </div>
-                    <span className="text-sm text-gray-700">{service.name}</span>
+                    <span className="text-xs text-gray-700 text-center leading-tight">{service.name}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Node Count */}
+            {/* Node Count and Test Button */}
             <div className="mt-auto pt-4 border-t border-gray-200">
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 mb-2">
                 Number of nodes: {nodes.length}
               </div>
+              <div className="text-xs text-gray-500 mb-2">
+                Number of edges: {edges.length}
+              </div>
+              {nodes.length >= 2 && (
+                <Button 
+                  onClick={testConnection}
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs"
+                >
+                  Test Connection
+                </Button>
+              )}
             </div>
           </div>
         </aside>
 
         {/* Central Canvas */}
         <main className="flex-1 flex flex-col">
-          {/* Canvas Toolbar */}
-          <div className="h-12 border-b border-gray-200 bg-white flex items-center justify-between px-4">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <ZoomIn className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <ZoomOut className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <Maximize2 className="w-4 h-4" />
-              </Button>
-              <div className="w-px h-6 bg-gray-200 mx-2" />
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <Undo className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <Redo className="w-4 h-4" />
-              </Button>
-              <div className="w-px h-6 bg-gray-200 mx-2" />
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <Download className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <History className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <FileText className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
 
           {/* Canvas Area */}
           <div className="flex-1 relative bg-gray-50">
@@ -425,73 +452,101 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
                   onNodesChange={onNodesChange}
                   onEdgesChange={onEdgesChange}
                   onConnect={onConnect}
-                  onInit={setReactFlowInstance}
+                  onInit={(instance) => {
+                    console.log('ReactFlow initialized:', instance)
+                    setReactFlowInstance(instance as any)
+                  }}
                   onDrop={onDrop}
                   onDragOver={onDragOver}
-                  nodeTypes={nodeTypes}
-                  edgeTypes={edgeTypes}
+                  nodeTypes={createNodeTypes(handleNodeDoubleClick)}
+                  // edgeTypes={createEdgeTypes()}
                   fitView
                   className="bg-gray-50"
                   connectionLineStyle={{ stroke: "#666", strokeWidth: 2 }}
-                  defaultEdgeOptions={{ type: "connection" }}
+                  defaultEdgeOptions={defaultEdgeOptions}
+                  snapToGrid={true}
+                  snapGrid={[20, 20]}
+                  panOnDrag={true}
+                  panOnScroll={false}
+                  panOnScrollSpeed={0}
+                  selectNodesOnDrag={false}
+                  nodesDraggable={true}
+                  nodesConnectable={true}
+                  elementsSelectable={true}
+                  elevateNodesOnSelect={false}
+                  autoPanOnNodeDrag={false}
+                  zoomOnScroll={true}
+                  minZoom={0.1}
+                  maxZoom={4}
                 >
                   <Background 
                     variant={BackgroundVariant.Dots} 
                     gap={20} 
-                    size={1} 
-                    color="#d1d5db"
+                    size={2} 
+                    color="#9ca3af"
                     style={{ backgroundColor: '#f9fafb' }}
                   />
-                  <Controls className="bg-white border border-gray-200 shadow-sm" />
+                  <Controls />
                 </ReactFlow>
               </ReactFlowProvider>
             </div>
-
-            {nodes.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">🎨</div>
-                  <h3 className="text-xl font-semibold mb-2 text-gray-900">Start Building</h3>
-                  <p className="text-gray-500 max-w-md text-pretty">
-                    Drag and drop cloud services from the sidebar to start designing your infrastructure.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
         </main>
 
-        {/* Right Code Editor Panel */}
-        <aside className="w-80 border-l border-gray-200 bg-gray-900 text-white">
-          <div className="h-full flex flex-col">
-            {/* Code Editor Header */}
-            <div className="h-12 border-b border-gray-700 flex items-center justify-between px-4">
-              <div className="flex items-center gap-2">
-                <Code className="w-4 h-4" />
-                <span className="text-sm font-medium">main.tf</span>
-                <ChevronDown className="w-3 h-3" />
+        {/* Right Panel - Configuration or Code Editor */}
+        {isConfigPanelOpen ? (
+          <ConfigurationPanel
+            isOpen={isConfigPanelOpen}
+            onClose={handleCloseConfigPanel}
+            nodeData={selectedNode}
+            serviceConfig={null} // This will be loaded by the configuration panel
+            onConfigUpdate={handleConfigUpdate}
+          />
+        ) : (
+          <aside className="w-80 border-l border-gray-200 bg-gray-900 text-white">
+            <div className="h-full flex flex-col">
+              {/* Code Editor Header */}
+              <div className="h-12 border-b border-gray-700 flex items-center justify-between px-4">
+                <div className="flex items-center gap-2">
+                  <Code className="w-4 h-4" />
+                  <Select value={activeFile} onValueChange={handleFileChange}>
+                    <SelectTrigger className="w-32 bg-gray-800 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-600">
+                      <SelectItem value="main.tf" className="text-white hover:bg-gray-700">main.tf</SelectItem>
+                      <SelectItem value="variables.tf" className="text-white hover:bg-gray-700">variables.tf</SelectItem>
+                      <SelectItem value="outputs.tf" className="text-white hover:bg-gray-700">outputs.tf</SelectItem>
+                      <SelectItem value="providers.tf" className="text-white hover:bg-gray-700">providers.tf</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                    <Download className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                    <Pin className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                    <Play className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                  <Download className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                  <Pin className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                  <Play className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
 
-            {/* Code Content */}
-            <div className="flex-1 overflow-auto p-4">
-              <pre className="text-sm font-mono leading-relaxed">
-                <code>{generateTerraformCode()}</code>
-              </pre>
+              {/* Code Content */}
+              <div className="flex-1 overflow-auto p-4">
+                <textarea
+                  value={terraformFiles[activeFile as keyof typeof terraformFiles]}
+                  onChange={(e) => handleFileContentChange(e.target.value)}
+                  className="terraform-editor w-full h-full bg-transparent text-sm text-white resize-none border-none outline-none"
+                  placeholder="Start typing your Terraform configuration..."
+                  spellCheck={false}
+                />
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   )

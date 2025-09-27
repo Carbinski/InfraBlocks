@@ -28,7 +28,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     ec2: {
       id: "ec2",
       name: "EC2",
-      icon: "/Arch_Amazon-EC2_64.png",
+      icon: "/aws/Arch_Amazon-EC2_64.svg",
       category: "Compute",
       description: "Virtual servers in the cloud",
       terraformType: "aws_instance",
@@ -65,7 +65,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     s3: {
       id: "s3",
       name: "S3",
-      icon: "/Arch_Amazon-S3-on-Outposts_64.png",
+      icon: "/aws/Arch_Amazon-S3-on-Outposts_64.svg",
       category: "Storage",
       description: "Object storage service",
       terraformType: "aws_s3_bucket",
@@ -99,7 +99,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     rds: {
       id: "rds",
       name: "RDS",
-      icon: "/Arch_Amazon-RDS_64.png",
+      icon: "/aws/Arch_Amazon-RDS_64.svg",
       category: "Database",
       description: "Managed relational database",
       terraformType: "aws_db_instance",
@@ -142,7 +142,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     lambda: {
       id: "lambda",
       name: "Lambda",
-      icon: "/Arch_AWS-Lambda_64.png",
+      icon: "/aws/Arch_AWS-Lambda_64.svg",
       category: "Compute",
       description: "Serverless compute service",
       terraformType: "aws_lambda_function",
@@ -253,7 +253,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     dynamodb: {
       id: "dynamodb",
       name: "DynamoDB",
-      icon: "/Arch_Amazon-DynamoDB_64.png",
+      icon: "/aws/Arch_Amazon-DynamoDB_64.svg",
       category: "Database",
       description: "NoSQL database service",
       terraformType: "aws_dynamodb_table",
@@ -285,7 +285,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     cognito: {
       id: "cognito",
       name: "Cognito",
-      icon: "/Arch_Amazon-Cognito_64.png",
+      icon: "/aws/Arch_Amazon-Cognito_64.svg",
       category: "Security",
       description: "User authentication and management",
       terraformType: "aws_cognito_user_pool",
@@ -308,7 +308,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     cloudwatch: {
       id: "cloudwatch",
       name: "CloudWatch",
-      icon: "/Arch_Amazon-CloudWatch_64.png",
+      icon: "/aws/Arch_Amazon-CloudWatch_64.svg",
       category: "Monitoring",
       description: "Monitoring and observability service",
       terraformType: "aws_cloudwatch_log_group",
@@ -335,7 +335,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     api_gateway: {
       id: "api_gateway",
       name: "API Gateway",
-      icon: "/Arch_Amazon-API-Gateway_64.png",
+      icon: "/aws/Arch_Amazon-API-Gateway_64.svg",
       category: "Network",
       description: "API management service",
       terraformType: "aws_api_gateway_rest_api",
@@ -359,7 +359,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     fargate: {
       id: "fargate",
       name: "Fargate",
-      icon: "/Arch_AWS-Fargate_64.png",
+      icon: "/aws/Arch_AWS-Fargate_64.svg",
       category: "Compute",
       description: "Serverless container platform",
       terraformType: "aws_ecs_service",
@@ -394,7 +394,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     step_functions: {
       id: "step_functions",
       name: "Step Functions",
-      icon: "/Arch_AWS-Step-Functions_64.png",
+      icon: "/aws/Arch_AWS-Step-Functions_64.svg",
       category: "Integration",
       description: "Workflow orchestration service",
       terraformType: "aws_sfn_state_machine",
@@ -417,7 +417,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
     secrets_manager: {
       id: "secrets_manager",
       name: "Secrets Manager",
-      icon: "/Arch_AWS-Secrets-Manager_64.png",
+      icon: "/aws/Arch_AWS-Secrets-Manager_64.svg",
       category: "Security",
       description: "Secrets management service",
       terraformType: "aws_secretsmanager_secret",

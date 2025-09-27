@@ -1,0 +1,72 @@
+{
+  "id": "lambda",
+  "name": "Lambda",
+  "icon": "/aws/Arch_AWS-Lambda_64.svg",
+  "category": "Compute",
+  "description": "Serverless compute service",
+  "terraformType": "aws_lambda_function",
+  "defaultConfig": {
+    "function_name": "",
+    "runtime": "nodejs18.x",
+    "memory_size": 128,
+    "timeout": 30,
+    "handler": "index.handler"
+  },
+  "configSchema": {
+    "function_name": {
+      "type": "string",
+      "label": "Function Name",
+      "description": "The name of the Lambda function",
+      "required": true
+    },
+    "runtime": {
+      "type": "select",
+      "label": "Runtime",
+      "description": "The runtime environment for the Lambda function",
+      "options": ["nodejs18.x", "nodejs16.x", "python3.9", "python3.8", "java11", "dotnet6", "go1.x"],
+      "default": "nodejs18.x",
+      "required": true
+    },
+    "memory_size": {
+      "type": "number",
+      "label": "Memory (MB)",
+      "description": "The amount of memory allocated to the function",
+      "default": 128,
+      "required": true,
+      "validation": {
+        "min": 128,
+        "max": 10240
+      }
+    },
+    "timeout": {
+      "type": "number",
+      "label": "Timeout (seconds)",
+      "description": "The function execution timeout",
+      "default": 30,
+      "required": true,
+      "validation": {
+        "min": 1,
+        "max": 900
+      }
+    },
+    "handler": {
+      "type": "string",
+      "label": "Handler",
+      "description": "The function entrypoint",
+      "default": "index.handler",
+      "required": true
+    },
+    "environment_variables": {
+      "type": "string",
+      "label": "Environment Variables",
+      "description": "JSON string of environment variables",
+      "required": false
+    },
+    "dead_letter_config": {
+      "type": "boolean",
+      "label": "Enable Dead Letter Queue",
+      "description": "Configure a dead letter queue for failed invocations",
+      "default": false
+    }
+  }
+}

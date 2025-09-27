@@ -130,3 +130,146 @@
     linear-gradient(90deg, hsl(var(--muted-foreground) / 0.1) 1px, transparent 1px);
   background-size: 20px 20px;
 }
+
+/* ReactFlow Controls styling */
+.react-flow__controls {
+  position: absolute !important;
+  bottom: 20px !important;
+  left: 20px !important;
+  z-index: 1000 !important;
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+.react-flow__controls-button {
+  background: white !important;
+  border: none !important;
+  color: #374151 !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+.react-flow__controls-button:active {
+  background: #e5e7eb !important;
+}
+
+.react-flow__controls-button svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* Terraform code editor styling */
+.terraform-editor {
+  font-family: 'Fira Code', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.terraform-editor:focus {
+  outline: none;
+}
+
+/* Basic syntax highlighting for Terraform */
+.terraform-editor::selection {
+  background-color: rgba(59, 130, 246, 0.3);
+}
+
+/* Force ReactFlow to use straight edges */
+.react-flow__edge {
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+/* Make connection handles more visible and easier to use */
+.react-flow__handle {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid white !important;
+  opacity: 0.8 !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Source handles (green) */
+.react-flow__handle[data-handleid*="source"] {
+  background: #10b981 !important;
+}
+
+/* Target handles (blue) */
+.react-flow__handle[data-handleid*="target"] {
+  background: #3b82f6 !important;
+}
+
+.react-flow__handle:hover {
+  opacity: 1 !important;
+  transform: scale(1.3) !important;
+}
+
+.react-flow__handle-connecting {
+  background: #f59e0b !important;
+  border-color: white !important;
+  transform: scale(1.4) !important;
+}
+
+.react-flow__handle-valid {
+  background: #10b981 !important;
+  border-color: white !important;
+}
+
+/* Improve edge selection and interaction */
+.react-flow__edge-path {
+  cursor: pointer !important;
+  pointer-events: all !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3 !important;
+  stroke: #3b82f6 !important;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3 !important;
+  stroke: #1d4ed8 !important;
+}
+
+/* Prevent connection handles from moving */
+.react-flow__handle {
+  position: absolute !important;
+  transform: none !important;
+}
+
+/* Ensure handles stay in place */
+.react-flow__handle-top {
+  top: -6px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.react-flow__handle-bottom {
+  bottom: -6px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.react-flow__handle-left {
+  left: -6px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+.react-flow__handle-right {
+  right: -6px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}

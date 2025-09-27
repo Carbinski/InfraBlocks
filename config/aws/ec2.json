@@ -1,0 +1,59 @@
+{
+  "id": "ec2",
+  "name": "EC2",
+  "icon": "/aws/Arch_Amazon-EC2_64.svg",
+  "category": "Compute",
+  "description": "Virtual servers in the cloud",
+  "terraformType": "aws_instance",
+  "defaultConfig": {
+    "instance_type": "t3.micro",
+    "ami": "ami-0abcdef1234567890",
+    "key_name": "",
+    "vpc_security_group_ids": []
+  },
+  "configSchema": {
+    "instance_type": {
+      "type": "select",
+      "label": "Instance Type",
+      "description": "The type of EC2 instance to launch",
+      "options": ["t3.micro", "t3.small", "t3.medium", "t3.large", "t3.xlarge", "t3.2xlarge"],
+      "default": "t3.micro",
+      "required": true
+    },
+    "ami": {
+      "type": "string",
+      "label": "AMI ID",
+      "description": "The Amazon Machine Image (AMI) to use for the instance",
+      "default": "ami-0abcdef1234567890",
+      "required": true,
+      "validation": {
+        "pattern": "^ami-[0-9a-f]{8,17}$"
+      }
+    },
+    "key_name": {
+      "type": "string",
+      "label": "Key Pair Name",
+      "description": "EC2 Key Pair for SSH access (optional)",
+      "required": false
+    },
+    "vpc_security_group_ids": {
+      "type": "multiselect",
+      "label": "Security Groups",
+      "description": "List of security group IDs to associate with the instance",
+      "options": [],
+      "required": false
+    },
+    "subnet_id": {
+      "type": "string",
+      "label": "Subnet ID",
+      "description": "The VPC subnet ID to launch the instance in",
+      "required": false
+    },
+    "associate_public_ip_address": {
+      "type": "boolean",
+      "label": "Associate Public IP",
+      "description": "Whether to associate a public IP address with the instance",
+      "default": false
+    }
+  }
+}
