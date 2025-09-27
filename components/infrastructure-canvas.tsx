@@ -33,7 +33,7 @@ import {
   Code,
   Download,
   History,
-  Play
+  Play,
   Pin,
   Brain
 } from "lucide-react"
@@ -308,8 +308,9 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     // Optional: Add visual feedback (could be enhanced with toast notifications)
     // For now, we'll just log the success
     console.log('✅ Configuration saved successfully!')
+  }
 
-    const handleAIReview = async () => {
+  const handleAIReview = async () => {
     setIsAIReviewOpen(true)
     setIsAIReviewLoading(true)
     setAiReviewError(null)
@@ -1105,6 +1106,8 @@ provider "aws" {
       <DeploymentStatusPanel
         isOpen={showDeploymentStatus}
         onClose={() => setShowDeploymentStatus(false)}
+      />
+      
       {/* AI Review Dialog */}
       <AIReviewDialog
         isOpen={isAIReviewOpen}
@@ -1116,3 +1119,4 @@ provider "aws" {
     </div>
   )
 }
+

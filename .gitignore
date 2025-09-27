@@ -32,4 +32,21 @@ next-env.d.ts
 # git attributes
 .gitattributes
 
+# terraform
+terraform-workspaces/
+*.tfplan
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfstate.d/
+.terraform.lock.hcl
+.terraform.tfstate.lock.info
+*.tfvars
+!*.tfvars.example
+
+# terraform logs and temporary files
+terraform.log
+terraform.log.*
+*.log
+
 ignore

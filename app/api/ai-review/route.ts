@@ -74,7 +74,7 @@ JSON formatting rules:
 - Be specific about file names and line numbers from the actual code provided`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
