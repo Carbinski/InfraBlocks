@@ -1,0 +1,73 @@
+{
+  "id": "cognito",
+  "name": "Cognito",
+  "icon": "/aws/Arch_Amazon-Cognito_64.svg",
+  "category": "Security",
+  "description": "User authentication and management",
+  "terraformType": "aws_cognito_user_pool",
+  "defaultConfig": {
+    "name": "user-pool",
+    "mfa_configuration": "OFF",
+    "password_min_length": 8,
+    "require_uppercase": true,
+    "require_lowercase": true,
+    "require_numbers": true,
+    "require_symbols": false
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "User Pool Name",
+      "description": "Name of the Cognito user pool",
+      "required": true
+    },
+    "alias_attributes": {
+      "type": "multiselect",
+      "label": "Alias Attributes",
+      "description": "Attributes users can sign in with",
+      "options": ["email", "phone_number", "preferred_username"]
+    },
+    "auto_verified_attributes": {
+      "type": "multiselect",
+      "label": "Auto-verified Attributes",
+      "description": "Attributes that Cognito auto verifies",
+      "options": ["email", "phone_number"]
+    },
+    "mfa_configuration": {
+      "type": "select",
+      "label": "MFA Configuration",
+      "options": ["OFF", "ON", "OPTIONAL"],
+      "default": "OFF"
+    },
+    "password_min_length": {
+      "type": "number",
+      "label": "Password Min Length",
+      "description": "Minimum password length",
+      "default": 8,
+      "validation": {
+        "min": 6,
+        "max": 99
+      }
+    },
+    "require_uppercase": {
+      "type": "boolean",
+      "label": "Require Uppercase Letters",
+      "default": true
+    },
+    "require_lowercase": {
+      "type": "boolean",
+      "label": "Require Lowercase Letters",
+      "default": true
+    },
+    "require_numbers": {
+      "type": "boolean",
+      "label": "Require Numbers",
+      "default": true
+    },
+    "require_symbols": {
+      "type": "boolean",
+      "label": "Require Symbols",
+      "default": false
+    }
+  }
+}

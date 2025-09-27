@@ -1,0 +1,40 @@
+{
+  "id": "step_functions",
+  "name": "Step Functions",
+  "icon": "/aws/Arch_AWS-Step-Functions_64.svg",
+  "category": "Integration",
+  "description": "Workflow orchestration service",
+  "terraformType": "aws_sfn_state_machine",
+  "defaultConfig": {
+    "name": "state-machine",
+    "definition": "{\"Comment\": \"A simple state machine\", \"StartAt\": \"HelloWorld\", \"States\": {\"HelloWorld\": {\"Type\": \"Pass\", \"Result\": \"Hello World!\", \"End\": true}}}",
+    "role_arn": ""
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "State Machine Name",
+      "description": "Name of the Step Functions state machine",
+      "required": true
+    },
+    "role_arn": {
+      "type": "string",
+      "label": "IAM Role ARN",
+      "description": "Execution role ARN for the state machine",
+      "required": true
+    },
+    "definition": {
+      "type": "string",
+      "label": "State Machine Definition",
+      "description": "Amazon States Language JSON definition",
+      "default": "{\"Comment\": \"A simple state machine\", \"StartAt\": \"HelloWorld\", \"States\": {\"HelloWorld\": {\"Type\": \"Pass\", \"Result\": \"Hello World!\", \"End\": true}}}",
+      "required": true
+    },
+    "logging_configuration": {
+      "type": "boolean",
+      "label": "Enable Logging",
+      "description": "Enable CloudWatch Logs integration",
+      "default": false
+    }
+  }
+}

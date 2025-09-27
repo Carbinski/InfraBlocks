@@ -1,0 +1,40 @@
+{
+  "id": "cloudwatch",
+  "name": "CloudWatch",
+  "icon": "/aws/Arch_Amazon-CloudWatch_64.svg",
+  "category": "Monitoring",
+  "description": "Monitoring and observability service",
+  "terraformType": "aws_cloudwatch_log_group",
+  "defaultConfig": {
+    "name": "application-logs",
+    "retention_in_days": 14
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "Log Group Name",
+      "description": "Name of the log group",
+      "required": true
+    },
+    "retention_in_days": {
+      "type": "number",
+      "label": "Retention (days)",
+      "description": "Number of days to retain logs",
+      "default": 14,
+      "validation": {
+        "min": 1,
+        "max": 3653
+      }
+    },
+    "kms_key_id": {
+      "type": "string",
+      "label": "KMS Key ID",
+      "description": "Optional KMS key for log encryption"
+    },
+    "tags": {
+      "type": "string",
+      "label": "Tags JSON",
+      "description": "JSON string of additional tags"
+    }
+  }
+}

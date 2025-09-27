@@ -1,0 +1,71 @@
+{
+  "id": "fargate",
+  "name": "Fargate",
+  "icon": "/aws/Arch_AWS-Fargate_64.svg",
+  "category": "Compute",
+  "description": "Serverless container platform",
+  "terraformType": "aws_ecs_service",
+  "defaultConfig": {
+    "name": "fargate-service",
+    "cluster": "",
+    "task_definition": "",
+    "launch_type": "FARGATE",
+    "desired_count": 1
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "Service Name",
+      "description": "Name of the ECS service",
+      "required": true
+    },
+    "cluster": {
+      "type": "string",
+      "label": "Cluster ARN or Name",
+      "description": "Target ECS cluster for this service",
+      "required": true
+    },
+    "task_definition": {
+      "type": "string",
+      "label": "Task Definition ARN",
+      "description": "Task definition to run on Fargate",
+      "required": true
+    },
+    "launch_type": {
+      "type": "select",
+      "label": "Launch Type",
+      "description": "Fargate or EC2 launch mode",
+      "options": ["FARGATE", "EC2"],
+      "default": "FARGATE",
+      "required": true
+    },
+    "desired_count": {
+      "type": "number",
+      "label": "Desired Count",
+      "description": "Number of tasks to run",
+      "default": 1,
+      "validation": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "subnets": {
+      "type": "multiselect",
+      "label": "Subnet IDs",
+      "description": "Subnets for the service ENIs",
+      "options": []
+    },
+    "security_groups": {
+      "type": "multiselect",
+      "label": "Security Group IDs",
+      "description": "Security groups for the service",
+      "options": []
+    },
+    "assign_public_ip": {
+      "type": "boolean",
+      "label": "Assign Public IP",
+      "description": "Assign a public IP address to tasks",
+      "default": false
+    }
+  }
+}
