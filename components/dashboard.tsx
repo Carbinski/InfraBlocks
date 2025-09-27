@@ -13,6 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { CredentialManager, type AWSCredentials, type AzureCredentials, type GCPCredentials } from "@/lib/credential-manager"
+import { testCredentials } from "@/lib/api-service"
 import { cn } from "@/lib/utils"
 import {
   Archive,
@@ -28,7 +30,7 @@ import {
   Shield,
   Trash2
 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 interface Project {
   id: string
@@ -49,6 +51,17 @@ export function Dashboard() {
   const [activeTab, setActiveTab] = useState<string>("home")
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  
+  // Credential states
+  const [awsCredentials, setAwsCredentials] = useState<Partial<AWSCredentials>>({})
+  const [gcpCredentials, setGcpCredentials] = useState<Partial<GCPCredentials>>({})
+  const [azureCredentials, setAzureCredentials] = useState<Partial<AzureCredentials>>({})
+  const [credentialErrors, setCredentialErrors] = useState<{[key: string]: string[]}>({})
+  const [credentialStatus, setCredentialStatus] = useState<{[key: string]: 'idle' | 'saving' | 'testing' | 'success' | 'error'}>({
+    aws: 'idle',
+    gcp: 'idle', 
+    azure: 'idle'
+  })
 
   const sidebarItems = [
     { id: "home", label: "Home", icon: Home },
@@ -105,6 +118,104 @@ export function Dashboard() {
     }
   }
 
+  // Load credentials on component mount
+  useEffect(() => {
+    const loadCredentials = () => {
+      const aws = CredentialManager.getCredentials('aws')
+      const gcp = CredentialManager.getCredentials('gcp')
+      const azure = CredentialManager.getCredentials('azure')
+      
+      if (aws) setAwsCredentials(aws)
+      if (gcp) setGcpCredentials(gcp)
+      if (azure) setAzureCredentials(azure)
+    }
+    
+    loadCredentials()
+  }, [])
+
+  // AWS credential handlers
+  const handleSaveAWSCredentials = async () => {
+    setCredentialStatus(prev => ({ ...prev, aws: 'saving' }))
+    
+    try {
+      const errors = CredentialManager.validateAWSCredentials(awsCredentials)
+      if (errors.length > 0) {
+        setCredentialErrors(prev => ({ ...prev, aws: errors }))
+        setCredentialStatus(prev => ({ ...prev, aws: 'error' }))
+        return
+      }
+
+      CredentialManager.saveCredentials('aws', awsCredentials)
+      setCredentialErrors(prev => ({ ...prev, aws: [] }))
+      setCredentialStatus(prev => ({ ...prev, aws: 'success' }))
+      
+      // Test credentials
+      setCredentialStatus(prev => ({ ...prev, aws: 'testing' }))
+      const testResult = await testCredentials('aws')
+      
+      if (testResult.valid) {
+        setCredentialStatus(prev => ({ ...prev, aws: 'success' }))
+      } else {
+        setCredentialStatus(prev => ({ ...prev, aws: 'error' }))
+        setCredentialErrors(prev => ({ ...prev, aws: [testResult.message] }))
+      }
+    } catch (error) {
+      setCredentialStatus(prev => ({ ...prev, aws: 'error' }))
+      setCredentialErrors(prev => ({ 
+        ...prev, 
+        aws: [error instanceof Error ? error.message : 'Failed to save credentials'] 
+      }))
+    }
+  }
+
+  // GCP credential handlers
+  const handleSaveGCPCredentials = async () => {
+    setCredentialStatus(prev => ({ ...prev, gcp: 'saving' }))
+    
+    try {
+      const errors = CredentialManager.validateGCPCredentials(gcpCredentials)
+      if (errors.length > 0) {
+        setCredentialErrors(prev => ({ ...prev, gcp: errors }))
+        setCredentialStatus(prev => ({ ...prev, gcp: 'error' }))
+        return
+      }
+
+      CredentialManager.saveCredentials('gcp', gcpCredentials)
+      setCredentialErrors(prev => ({ ...prev, gcp: [] }))
+      setCredentialStatus(prev => ({ ...prev, gcp: 'success' }))
+    } catch (error) {
+      setCredentialStatus(prev => ({ ...prev, gcp: 'error' }))
+      setCredentialErrors(prev => ({ 
+        ...prev, 
+        gcp: [error instanceof Error ? error.message : 'Failed to save credentials'] 
+      }))
+    }
+  }
+
+  // Azure credential handlers
+  const handleSaveAzureCredentials = async () => {
+    setCredentialStatus(prev => ({ ...prev, azure: 'saving' }))
+    
+    try {
+      const errors = CredentialManager.validateAzureCredentials(azureCredentials)
+      if (errors.length > 0) {
+        setCredentialErrors(prev => ({ ...prev, azure: errors }))
+        setCredentialStatus(prev => ({ ...prev, azure: 'error' }))
+        return
+      }
+
+      CredentialManager.saveCredentials('azure', azureCredentials)
+      setCredentialErrors(prev => ({ ...prev, azure: [] }))
+      setCredentialStatus(prev => ({ ...prev, azure: 'success' }))
+    } catch (error) {
+      setCredentialStatus(prev => ({ ...prev, azure: 'error' }))
+      setCredentialErrors(prev => ({ 
+        ...prev, 
+        azure: [error instanceof Error ? error.message : 'Failed to save credentials'] 
+      }))
+    }
+  }
+
   if (selectedProject) {
     return (
       <ProjectView
@@ -114,6 +225,7 @@ export function Dashboard() {
           setProjects(projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)))
           setSelectedProject(updatedProject)
         }}
+        onDeleteProject={handleDeleteProject}
       />
     )
   }
@@ -335,18 +447,61 @@ export function Dashboard() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-700">Access Key ID</label>
-                        <Input placeholder="AKIA..." className="mt-1" />
+                        <Input 
+                          placeholder="AKIA..." 
+                          className="mt-1" 
+                          value={awsCredentials.accessKeyId || ''}
+                          onChange={(e) => setAwsCredentials(prev => ({ ...prev, accessKeyId: e.target.value }))}
+                        />
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700">Secret Access Key</label>
-                        <Input type="password" placeholder="••••••••••••••••" className="mt-1" />
+                        <Input 
+                          type="password" 
+                          placeholder="••••••••••••••••" 
+                          className="mt-1"
+                          value={awsCredentials.secretAccessKey || ''}
+                          onChange={(e) => setAwsCredentials(prev => ({ ...prev, secretAccessKey: e.target.value }))}
+                        />
                       </div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-700">Region</label>
-                      <Input placeholder="us-east-1" className="mt-1" />
+                      <Input 
+                        placeholder="us-east-1" 
+                        className="mt-1"
+                        value={awsCredentials.region || ''}
+                        onChange={(e) => setAwsCredentials(prev => ({ ...prev, region: e.target.value }))}
+                      />
                     </div>
-                    <Button className="w-full">Save AWS Credentials</Button>
+                    
+                    {/* Error messages */}
+                    {credentialErrors.aws && credentialErrors.aws.length > 0 && (
+                      <div className="text-sm text-red-600">
+                        {credentialErrors.aws.map((error, index) => (
+                          <div key={index}>• {error}</div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Success message */}
+                    {credentialStatus.aws === 'success' && (
+                      <div className="text-sm text-green-600">
+                        ✓ AWS credentials saved and validated successfully!
+                      </div>
+                    )}
+                    
+                    <Button 
+                      className="w-full" 
+                      onClick={handleSaveAWSCredentials}
+                      disabled={credentialStatus.aws === 'saving' || credentialStatus.aws === 'testing'}
+                    >
+                      {credentialStatus.aws === 'saving' && 'Saving...'}
+                      {credentialStatus.aws === 'testing' && 'Testing credentials...'}
+                      {credentialStatus.aws === 'success' && 'Credentials Saved'}
+                      {credentialStatus.aws === 'error' && 'Save AWS Credentials'}
+                      {(credentialStatus.aws === 'idle') && 'Save AWS Credentials'}
+                    </Button>
                   </CardContent>
                 </Card>
 
