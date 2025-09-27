@@ -8,7 +8,10 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select"
+import { deployInfrastructure, getDeploymentStatus } from "@/lib/api-service"
+import { CredentialManager } from "@/lib/credential-manager"
 import { InfrastructureCanvasProps } from "@/types"
+import type { DeploymentStatus } from "@/types/deployment"
 import {
   addEdge,
   Background,
@@ -29,8 +32,9 @@ import {
   ArrowLeft,
   Code,
   Download,
+  History,
+  Play
   Pin,
-  Play,
   Brain
 } from "lucide-react"
 import GlassyPaneContainer from '@/src/cedar/components/containers/GlassyPaneContainer'
@@ -38,7 +42,9 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { CloudServiceNode } from "./cloud-service-node"
 import { ConfigurationPanel } from "./configuration-panel"
 import { getConnectionSuggestions, validateConnection } from "./connection-validator"
+import { DeploymentStatusPanel } from "./deployment-status-panel"
 import { serviceDefinitions } from "./service-definitions"
+import { TerraformGenerator } from "./terraform-generator"
 import { AIReviewDialog } from "./ai-review-dialog"
 
 
@@ -89,12 +95,17 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const [activeFile, setActiveFile] = useState("main.tf")
-  const [terraformFiles, setTerraformFiles] = useState({
+  const [terraformFiles, setTerraformFiles] = useState<Record<string, string>>({
     "main.tf": "",
     "variables.tf": "",
     "outputs.tf": "",
     "providers.tf": ""
   })
+
+  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus | null>(null)
+  const [isDeploying, setIsDeploying] = useState(false)
+  const [deploymentError, setDeploymentError] = useState<string | null>(null)
+  const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
   const [isAIReviewOpen, setIsAIReviewOpen] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
   const [isAIReviewLoading, setIsAIReviewLoading] = useState(false)
@@ -277,6 +288,10 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
             : node
         )
       )
+      // Trigger Terraform file regeneration after config update
+      setTimeout(() => {
+        updateMainTf()
+      }, 100)
     }
   }
 
@@ -285,7 +300,16 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     setSelectedNode(null)
   }
 
-  const handleAIReview = async () => {
+  const handleSaveConfig = () => {
+    // Trigger Terraform file regeneration when save is pressed
+    updateAllTerraformFiles()
+    console.log('Configuration saved - Terraform files updated')
+    
+    // Optional: Add visual feedback (could be enhanced with toast notifications)
+    // For now, we'll just log the success
+    console.log('✅ Configuration saved successfully!')
+
+    const handleAIReview = async () => {
     setIsAIReviewOpen(true)
     setIsAIReviewLoading(true)
     setAiReviewError(null)
@@ -324,31 +348,113 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
 # Drag and drop services from the sidebar to generate Terraform code`
     }
 
-    let terraformCode = `# Generated Terraform configuration\n\n`
-    
-    nodes.forEach((node) => {
-      const service = node.data as any
-      terraformCode += `resource "${service.terraformType}" "${service.id}" {\n`
-      
-      // Add basic configuration
-      if (service.config) {
-        Object.entries(service.config).forEach(([key, value]) => {
-          if (value) {
-            terraformCode += `  ${key} = "${value}"\n`
-          }
-        })
-      }
-      
-      terraformCode += `}\n\n`
-    })
-    
-    return terraformCode
+    try {
+      const terraformGenerator = new TerraformGenerator(provider, nodes, edges)
+      return terraformGenerator.generateTerraformCode()
+    } catch (error) {
+      console.error('Error generating Terraform code:', error)
+      return `# Error generating Terraform code: ${error}`
+    }
+  }
+
+  const handleDownloadTerraformCode = (activeFile: string) => {
+    const content = terraformFiles[activeFile];
+    if (!content) {
+      console.error("No content found for this file:", activeFile);
+      return;
+    }
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = activeFile; // use filename
+    link.click();
+
+    // cleanup
+    URL.revokeObjectURL(url);
+
   }
 
   // Initialize Terraform files with default content
   const initializeTerraformFiles = () => {
     const mainTf = generateTerraformCode()
-    const variablesTf = `# Variables for your infrastructure
+    
+    // Generate separate files using TerraformGenerator
+    let variablesTf = ""
+    let outputsTf = ""
+    let providersTf = ""
+    
+    if (nodes.length > 0) {
+      try {
+        const terraformGenerator = new TerraformGenerator(provider, nodes, edges)
+        const output = terraformGenerator.generate()
+        
+        // Generate variables.tf
+        if (Object.keys(output.variables).length > 0) {
+          variablesTf = "# Variables\n"
+          Object.entries(output.variables).forEach(([name, config]) => {
+            variablesTf += `variable "${name}" {\n`
+            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
+              if (key === "type" && value === "string") {
+                variablesTf += `  ${key} = ${value}\n`
+              } else if (typeof value === "string") {
+                variablesTf += `  ${key} = "${value}"\n`
+              } else if (typeof value === "boolean") {
+                variablesTf += `  ${key} = ${value}\n`
+              } else {
+                variablesTf += `  ${key} = ${JSON.stringify(value)}\n`
+              }
+            })
+            variablesTf += "}\n\n"
+          })
+        } else {
+          variablesTf = `# Variables for your infrastructure
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+`
+        }
+        
+        // Generate outputs.tf
+        if (Object.keys(output.outputs).length > 0) {
+          outputsTf = "# Outputs\n"
+          Object.entries(output.outputs).forEach(([name, config]) => {
+            outputsTf += `output "${name}" {\n`
+            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
+              if (typeof value === "string") {
+                outputsTf += `  ${key} = "${value}"\n`
+              } else {
+                outputsTf += `  ${key} = ${value}\n`
+              }
+            })
+            outputsTf += "}\n\n"
+          })
+        } else {
+          outputsTf = `# Outputs for your infrastructure
+output "resources_created" {
+  description = "Number of resources created"
+  value       = ${nodes.length}
+}
+`
+        }
+        
+        // Generate providers.tf
+        providersTf = terraformGenerator.generateProviderBlock()
+        
+      } catch (error) {
+        console.error('Error generating Terraform files:', error)
+        // Fallback to default content
+        variablesTf = `# Variables for your infrastructure
 variable "region" {
   description = "AWS region"
   type        = string
@@ -362,14 +468,14 @@ variable "environment" {
 }
 `
 
-    const outputsTf = `# Outputs for your infrastructure
+        outputsTf = `# Outputs for your infrastructure
 output "resources_created" {
   description = "Number of resources created"
   value       = ${nodes.length}
 }
 `
 
-    const providersTf = `# Provider configuration
+        providersTf = `# Provider configuration
 terraform {
   required_providers {
     aws = {
@@ -383,6 +489,45 @@ provider "aws" {
   region = var.region
 }
 `
+      }
+    } else {
+      // Default content when no nodes
+      variablesTf = `# Variables for your infrastructure
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+`
+
+      outputsTf = `# Outputs for your infrastructure
+output "resources_created" {
+  description = "Number of resources created"
+  value       = ${nodes.length}
+}
+`
+
+      providersTf = `# Provider configuration
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+}
+`
+    }
 
     setTerraformFiles({
       "main.tf": mainTf,
@@ -405,13 +550,239 @@ provider "aws" {
     setActiveFile(fileName)
   }
 
-  // Update main.tf when nodes change
+  // Handle Terraform deployment
+  const handleDeploy = async () => {
+    if (nodes.length === 0) {
+      setDeploymentError("No infrastructure defined. Please add some services to deploy.")
+      return
+    }
+
+    // Check if credentials are configured
+    if (!CredentialManager.hasCredentials(provider as 'aws' | 'gcp' | 'azure')) {
+      setDeploymentError(`No ${provider.toUpperCase()} credentials configured. Please configure credentials in settings.`)
+      return
+    }
+
+    setIsDeploying(true)
+    setDeploymentError(null)
+    setDeploymentStatus(null)
+
+    try {
+      const deploymentRequest = {
+        name: `Infrastructure Deployment ${new Date().toLocaleString()}`,
+        provider: provider as 'aws' | 'gcp' | 'azure',
+        nodes: nodes,
+        edges: edges,
+        autoApprove: false
+      }
+
+      const result = await deployInfrastructure(deploymentRequest)
+      
+      if (result.success) {
+        // Start polling for deployment status
+        startDeploymentPolling(result.deploymentId)
+      } else {
+        setDeploymentError(result.error || 'Deployment failed')
+        setIsDeploying(false)
+      }
+    } catch (error) {
+      setDeploymentError(error instanceof Error ? error.message : 'Unknown error occurred')
+      setIsDeploying(false)
+    }
+  }
+
+  // Poll deployment status
+  const startDeploymentPolling = (deploymentId: string) => {
+    const pollInterval = setInterval(() => {
+      const status = getDeploymentStatus(deploymentId)
+      
+      if (status) {
+        setDeploymentStatus(status)
+        
+        if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+          clearInterval(pollInterval)
+          setIsDeploying(false)
+          
+          if (status.status === 'failed') {
+            setDeploymentError(status.error || 'Deployment failed')
+          }
+        }
+      } else {
+        clearInterval(pollInterval)
+        setIsDeploying(false)
+        setDeploymentError('Deployment status not found')
+      }
+    }, 2000) // Poll every 2 seconds
+
+    // Cleanup interval after 10 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval)
+    }, 600000)
+  }
+
+  // Update all Terraform files when nodes change
+  const updateAllTerraformFiles = () => {
+    const mainTf = generateTerraformCode()
+    
+    // Generate separate files using TerraformGenerator
+    let variablesTf = ""
+    let outputsTf = ""
+    let providersTf = ""
+    
+    if (nodes.length > 0) {
+      try {
+        const terraformGenerator = new TerraformGenerator(provider, nodes, edges)
+        const output = terraformGenerator.generate()
+        
+        // Generate variables.tf
+        if (Object.keys(output.variables).length > 0) {
+          variablesTf = "# Variables\n"
+          Object.entries(output.variables).forEach(([name, config]) => {
+            variablesTf += `variable "${name}" {\n`
+            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
+              if (key === "type" && value === "string") {
+                variablesTf += `  ${key} = ${value}\n`
+              } else if (typeof value === "string") {
+                variablesTf += `  ${key} = "${value}"\n`
+              } else if (typeof value === "boolean") {
+                variablesTf += `  ${key} = ${value}\n`
+              } else {
+                variablesTf += `  ${key} = ${JSON.stringify(value)}\n`
+              }
+            })
+            variablesTf += "}\n\n"
+          })
+        } else {
+          variablesTf = `# Variables for your infrastructure
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+`
+        }
+        
+        // Generate outputs.tf
+        if (Object.keys(output.outputs).length > 0) {
+          outputsTf = "# Outputs\n"
+          Object.entries(output.outputs).forEach(([name, config]) => {
+            outputsTf += `output "${name}" {\n`
+            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
+              if (typeof value === "string") {
+                outputsTf += `  ${key} = "${value}"\n`
+              } else {
+                outputsTf += `  ${key} = ${value}\n`
+              }
+            })
+            outputsTf += "}\n\n"
+          })
+        } else {
+          outputsTf = `# Outputs for your infrastructure
+output "resources_created" {
+  description = "Number of resources created"
+  value       = ${nodes.length}
+}
+`
+        }
+        
+        // Generate providers.tf
+        providersTf = terraformGenerator.generateProviderBlock()
+        
+      } catch (error) {
+        console.error('Error generating Terraform files:', error)
+        // Fallback to default content
+        variablesTf = `# Variables for your infrastructure
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+`
+
+        outputsTf = `# Outputs for your infrastructure
+output "resources_created" {
+  description = "Number of resources created"
+  value       = ${nodes.length}
+}
+`
+
+        providersTf = `# Provider configuration
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+}
+`
+      }
+    } else {
+      // Default content when no nodes
+      variablesTf = `# Variables for your infrastructure
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+`
+
+      outputsTf = `# Outputs for your infrastructure
+output "resources_created" {
+  description = "Number of resources created"
+  value       = ${nodes.length}
+}
+`
+
+      providersTf = `# Provider configuration
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+}
+`
+    }
+
+    setTerraformFiles({
+      "main.tf": mainTf,
+      "variables.tf": variablesTf,
+      "outputs.tf": outputsTf,
+      "providers.tf": providersTf
+    })
+  }
+
+  // Update main.tf when nodes change (kept for backward compatibility)
   const updateMainTf = () => {
-    const newMainTf = generateTerraformCode()
-    setTerraformFiles(prev => ({
-      ...prev,
-      "main.tf": newMainTf
-    }))
+    updateAllTerraformFiles()
   }
 
   // Initialize files on component mount
@@ -428,8 +799,17 @@ provider "aws" {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        event.preventDefault()
-        deleteSelectedElements()
+        // Only prevent default if not typing in an input field
+        const target = event.target as HTMLElement
+        const isInputField = target.tagName === 'INPUT' || 
+                            target.tagName === 'TEXTAREA' || 
+                            target.contentEditable === 'true' ||
+                            target.getAttribute('role') === 'textbox'
+        
+        if (!isInputField) {
+          event.preventDefault()
+          deleteSelectedElements()
+        }
       }
     }
 
@@ -453,6 +833,17 @@ provider "aws" {
               <span className="text-gray-900 text-xs font-bold">A</span>
             </div>
             <span className="text-sm font-medium text-gray-600">aws</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowDeploymentStatus(true)}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <History className="w-4 h-4 mr-2" />
+              Deployments
+            </Button>
           </div>
         </div>
       </header>
@@ -606,6 +997,7 @@ provider "aws" {
             nodeData={selectedNode}
             serviceConfig={null} // This will be loaded by the configuration panel
             onConfigUpdate={handleConfigUpdate}
+            onSave={handleSaveConfig}
           />
         ) : (
           <aside className="w-80 border-l border-gray-200 bg-gray-50 text-gray-900">
@@ -627,21 +1019,79 @@ provider "aws" {
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                  <Button onClick={() => handleDownloadTerraformCode(activeFile)} variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Download className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-gray-600 hover:text-gray-900"
+                    onClick={handleDeploy}
+                    disabled={isDeploying}
+                  >
                     <Play className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
 
               {/* Code Content */}
-              <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              <div className="flex-1 overflow-auto p-4 bg-gray-50 flex flex-col">
+                {/* Deployment Status */}
+                {(isDeploying || deploymentStatus || deploymentError) && (
+                  <div className="mb-4 p-3 bg-white rounded-lg border">
+                    {isDeploying && deploymentStatus && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-900">
+                            {deploymentStatus.message}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {deploymentStatus.progress}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${deploymentStatus.progress}%` }}
+                          ></div>
+                        </div>
+                        {deploymentStatus.logs.length > 0 && (
+                          <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded max-h-20 overflow-y-auto">
+                            {deploymentStatus.logs.slice(-3).map((log, index) => (
+                              <div key={index} className="mb-1">{log}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {deploymentError && (
+                      <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                        <div className="font-medium">Deployment Error:</div>
+                        <div>{deploymentError}</div>
+                      </div>
+                    )}
+                    
+                    {deploymentStatus?.status === 'completed' && (
+                      <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                        <div className="font-medium">✓ Deployment Completed Successfully!</div>
+                        {deploymentStatus.outputs && (
+                          <div className="mt-2 text-xs">
+                            <div className="font-medium">Outputs:</div>
+                            {Object.entries(deploymentStatus.outputs).map(([key, value]) => (
+                              <div key={key}>{key}: {String(value)}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <textarea
                   value={terraformFiles[activeFile as keyof typeof terraformFiles]}
                   onChange={(e) => handleFileContentChange(e.target.value)}
-                  className="terraform-editor w-full h-full bg-gray-50 text-sm text-gray-900 resize-none border-none outline-none"
+                  className="terraform-editor flex-1 bg-gray-50 text-sm text-gray-900 resize-none border-none outline-none"
                   placeholder="Start typing your Terraform configuration..."
                   spellCheck={false}
                 />
@@ -651,6 +1101,10 @@ provider "aws" {
         )}
       </div>
 
+      {/* Deployment Status Panel */}
+      <DeploymentStatusPanel
+        isOpen={showDeploymentStatus}
+        onClose={() => setShowDeploymentStatus(false)}
       {/* AI Review Dialog */}
       <AIReviewDialog
         isOpen={isAIReviewOpen}
