@@ -63,6 +63,7 @@ export interface ConfigurationPanelProps {
   } | null
   serviceConfig: any | null
   onConfigUpdate: (config: Record<string, any>) => void
+  onSave?: () => void
 }
 
 // Infrastructure Canvas Types

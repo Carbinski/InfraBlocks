@@ -3,9 +3,25 @@
 
 import { InfrastructureCanvas } from "@/components/infrastructure-canvas"
 import { ProviderSelection } from "@/components/provider-selection"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, MoreHorizontal, RefreshCw, Settings, Share } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu"
+import { ArrowLeft, MoreHorizontal, RefreshCw, Settings, Share, Trash2 } from "lucide-react"
 import { useState } from "react"
 
 interface Project {
@@ -23,16 +39,17 @@ interface ProjectViewProps {
   project: Project
   onBack: () => void
   onUpdateProject: (project: Project) => void
+  onDeleteProject: (projectId: string) => void
 }
 
-export function ProjectView({ project, onBack, onUpdateProject }: ProjectViewProps) {
+export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject }: ProjectViewProps) {
   const [selectedProvider, setSelectedProvider] = useState<"aws" | "gcp" | "azure" | null>(project.provider || null)
   const [showCanvas, setShowCanvas] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const handleProviderSelect = (provider: "aws" | "gcp" | "azure") => {
     setSelectedProvider(provider)
 
-    // Update project with selected provider
     const updatedProject = {
       ...project,
       provider,
@@ -40,7 +57,6 @@ export function ProjectView({ project, onBack, onUpdateProject }: ProjectViewPro
     }
     onUpdateProject(updatedProject)
     
-    // Automatically go to canvas after provider selection
     setShowCanvas(true)
   }
 
@@ -48,7 +64,6 @@ export function ProjectView({ project, onBack, onUpdateProject }: ProjectViewPro
     setSelectedProvider(null)
     setShowCanvas(false)
 
-    // Update project to remove provider
     const updatedProject = {
       ...project,
       provider: undefined,
@@ -68,6 +83,11 @@ export function ProjectView({ project, onBack, onUpdateProject }: ProjectViewPro
       lastModified: "Just now",
     }
     onUpdateProject(updatedProject)
+  }
+
+  const handleDeleteProject = () => {
+    onDeleteProject(project.id)
+    onBack() 
   }
 
   return (
@@ -107,9 +127,19 @@ export function ProjectView({ project, onBack, onUpdateProject }: ProjectViewPro
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </Button>
-              <Button variant="ghost" size="sm" className="hover:bg-accent">
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="hover:bg-accent">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Project
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
 
@@ -128,6 +158,28 @@ export function ProjectView({ project, onBack, onUpdateProject }: ProjectViewPro
           onBack={handleBackToProviderSelection}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{project.name}"? This action cannot be undone.
+              All project data and configurations will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -39,17 +39,39 @@ export class TerraformGenerator {
   }
 
   private generateResources(): TerraformResource[] {
-    return this.nodes.map((node) => {
+    const resources: TerraformResource[] = []
+    
+    this.nodes.forEach((node) => {
       const dependencies = this.getDependencies(node.id)
       const config = this.generateResourceConfig(node)
 
-      return {
+      // Add the main resource
+      resources.push({
         type: node.data.terraformType as string,
         name: this.sanitizeName((node.data.name as string) || (node.data.id as string)),
         config,
         dependencies,
+      })
+
+      // Add additional resources for specific services
+      if (node.data.id === 's3') {
+        // Add public access block for S3 buckets
+        resources.push({
+          type: 'aws_s3_bucket_public_access_block',
+          name: this.sanitizeName((node.data.name as string) || (node.data.id as string)),
+          config: {
+            bucket: `${node.data.terraformType as string}.${this.sanitizeName((node.data.name as string) || (node.data.id as string))}.id`,
+            block_public_acls: true,
+            block_public_policy: true,
+            ignore_public_acls: true,
+            restrict_public_buckets: true,
+          },
+          dependencies: [`${node.data.terraformType as string}.${this.sanitizeName((node.data.name as string) || (node.data.id as string))}`],
+        })
       }
     })
+    
+    return resources
   }
 
   private generateResourceConfig(node: Node): Record<string, any> {
@@ -91,12 +113,6 @@ export class TerraformGenerator {
           bucket: config.bucket_name || `${this.sanitizeName(node.data.name as string)}-bucket-${Date.now()}`,
           versioning: {
             enabled: config.versioning === "Enabled",
-          },
-          public_access_block: {
-            block_public_acls: config.public_access === "Blocked",
-            block_public_policy: config.public_access === "Blocked",
-            ignore_public_acls: config.public_access === "Blocked",
-            restrict_public_buckets: config.public_access === "Blocked",
           },
           tags: {
             Name: config.name || node.data.name,
@@ -290,8 +306,9 @@ export class TerraformGenerator {
       default: this.getDefaultRegion(),
     }
 
-    // Add provider-specific variables
-    if (this.provider === "aws") {
+    // Only add db_password if there are RDS nodes
+    const hasRDS = this.nodes.some(node => node.data.id === 'rds')
+    if (this.provider === "aws" && hasRDS) {
       variables.db_password = {
         description: "Database password",
         type: "string",
@@ -408,7 +425,9 @@ export class TerraformGenerator {
       Object.entries(output.variables).forEach(([name, config]) => {
         terraformCode += `variable "${name}" {\n`
         Object.entries(config as Record<string, any>).forEach(([key, value]) => {
-          if (typeof value === "string") {
+          if (key === "type" && value === "string") {
+            terraformCode += `  ${key} = ${value}\n`
+          } else if (typeof value === "string") {
             terraformCode += `  ${key} = "${value}"\n`
           } else if (typeof value === "boolean") {
             terraformCode += `  ${key} = ${value}\n`
@@ -452,7 +471,7 @@ export class TerraformGenerator {
     return terraformCode
   }
 
-  private generateProviderBlock(): string {
+  generateProviderBlock(): string {
     switch (this.provider) {
       case "aws":
         return `terraform {
@@ -510,7 +529,7 @@ resource "azurerm_resource_group" "main" {
     }
   }
 
-  private formatResourceConfig(config: Record<string, any>, indent: number): string {
+  private formatResourceConfig(config: Record<string, any>, indent: number, parentKey?: string): string {
     let result = ""
     const spaces = "  ".repeat(indent)
 
@@ -535,8 +554,17 @@ resource "azurerm_resource_group" "main" {
       } else if (Array.isArray(value)) {
         result += `${spaces}${key} = [${value.map((v) => (typeof v === "string" ? `"${v}"` : v)).join(", ")}]\n`
       } else if (typeof value === "object") {
-        result += `${spaces}${key} {\n`
-        result += this.formatResourceConfig(value, indent + 1)
+        // Special handling for different types of objects
+        if (key === "tags" || parentKey === "tags") {
+          // Tags should always be arguments
+          result += `${spaces}${key} = {\n`
+        } else if (key === "versioning" || key === "lifecycle" || key === "provisioner") {
+          // These should be blocks
+          result += `${spaces}${key} {\n`
+        } else {
+          result += `${spaces}${key} {\n`
+        }
+        result += this.formatResourceConfig(value, indent + 1, key)
         result += `${spaces}}\n`
       }
     })
