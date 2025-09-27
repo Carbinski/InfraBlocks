@@ -164,9 +164,6 @@ export function Dashboard() {
           </div>
         </nav>
 
-    
-
-
         {/* User Info */}
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center gap-3">
