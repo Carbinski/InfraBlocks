@@ -32,4 +32,7 @@ next-env.d.ts
 # git attributes
 .gitattributes
 
+/config/aws/terraform-output/
+/terraform/terraform-improved/
+
 ignore

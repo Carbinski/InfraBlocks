@@ -7,7 +7,7 @@
   "terraformType": "aws_sfn_state_machine",
   "defaultConfig": {
     "name": "state-machine",
-    "definition": "{\"Comment\": \"A simple state machine\", \"StartAt\": \"HelloWorld\", \"States\": {\"HelloWorld\": {\"Type\": \"Pass\", \"Result\": \"Hello World!\", \"End\": true}}}",
+    "definition": "",
     "role_arn": ""
   },
   "configSchema": {
@@ -26,8 +26,8 @@
     "definition": {
       "type": "string",
       "label": "State Machine Definition",
-      "description": "Amazon States Language JSON definition",
-      "default": "{\"Comment\": \"A simple state machine\", \"StartAt\": \"HelloWorld\", \"States\": {\"HelloWorld\": {\"Type\": \"Pass\", \"Result\": \"Hello World!\", \"End\": true}}}",
+      "description":"Paste the Amazon States Language (ASL) JSON for your workflow",
+      "default": "",
       "required": true
     },
     "logging_configuration": {

@@ -333,7 +333,7 @@ export const serviceDefinitions: Record<string, Record<string, ServiceDefinition
       description: "Workflow orchestration service",
       terraformType: "aws_sfn_state_machine",
       defaultConfig: {
-        definition: '{"Comment": "A simple state machine", "StartAt": "HelloWorld", "States": {"HelloWorld": {"Type": "Pass", "Result": "Hello World!", "End": true}}}',
+        definition: "",
       },
       configSchema: {
         name: {

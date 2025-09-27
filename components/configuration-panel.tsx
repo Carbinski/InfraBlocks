@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ConfigLoader, ServiceConfig } from "@/lib/config-loader"
 import { ConfigurationPanelProps } from "@/types"
 import { Info, MoreHorizontal, Save, Undo, X } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 export function ConfigurationPanel({ 
   isOpen, 
@@ -22,6 +22,22 @@ export function ConfigurationPanel({
   const [searchTerm, setSearchTerm] = useState("")
   const [loadedServiceConfig, setLoadedServiceConfig] = useState<ServiceConfig | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const enhancedServiceIds = useMemo(() => new Set([
+    'fargate',
+    'step_functions',
+    'secrets_manager',
+    'cognito',
+    'cloudwatch',
+  ]), [])
+
+  useEffect(() => {
+    if (!nodeData) {
+      return
+    }
+
+    setConfig(nodeData.config || {})
+  }, [nodeData?.id, nodeData?.config])
 
   // Load service configuration when component mounts
   useEffect(() => {
@@ -39,23 +55,55 @@ export function ConfigurationPanel({
       }
     }
 
+    if (!isOpen || !nodeData) {
+      return
+    }
+
+    if (serviceConfig) {
+      setLoadedServiceConfig(serviceConfig)
+      return
+    }
+
     if (isOpen && nodeData) {
       loadConfig()
     }
-  }, [isOpen, nodeData?.provider, nodeData?.id])
+  }, [isOpen, nodeData?.provider, nodeData?.id, serviceConfig])
+
+  useEffect(() => {
+    if (!nodeData) {
+      return
+    }
+
+    if (!serviceConfig) {
+      return
+    }
+
+    if (!enhancedServiceIds.has(nodeData.id)) {
+      return
+    }
+
+    const mergedConfig = {
+      ...(serviceConfig.defaultConfig || {}),
+      ...(nodeData.config || {}),
+    }
+
+    setConfig(mergedConfig)
+  }, [serviceConfig, nodeData?.id, nodeData?.config, enhancedServiceIds])
 
   if (!isOpen || !nodeData) {
     return null
   }
 
   const currentServiceConfig = serviceConfig || loadedServiceConfig
-
+  
   const configSchema = currentServiceConfig?.configSchema || {}
   const filteredSchema = Object.entries(configSchema).filter(([key, fieldConfig]: [string, any]) => {
     if (!searchTerm) return true
     return fieldConfig.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
            key.toLowerCase().includes(searchTerm.toLowerCase())
   })
+
+  const shouldShowJsonPreview = nodeData ? enhancedServiceIds.has(nodeData.id) : false
 
   const updateConfig = (key: string, value: string) => {
     const newConfig = { ...config, [key]: value }
@@ -193,8 +241,8 @@ export function ConfigurationPanel({
       'batch': '/aws/Arch_AWS-Batch_64.svg',
       'fargate': '/aws/Arch_AWS-Fargate_64.svg',
       'iam': '/aws/Arch_AWS-IAM-Identity-Center_64.svg',
-      'secrets-manager': '/aws/Arch_AWS-Secrets-Manager_64.svg',
-      'step-functions': '/aws/Arch_AWS-Step-Functions_64.svg',
+      'secrets_manager': '/aws/Arch_AWS-Secrets-Manager_64.svg',
+      'step_functions': '/aws/Arch_AWS-Step-Functions_64.svg',
       'x-ray': '/aws/Arch_AWS-X-Ray_64.svg'
     }
 
