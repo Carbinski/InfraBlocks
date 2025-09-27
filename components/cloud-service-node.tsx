@@ -168,7 +168,7 @@ export const CloudServiceNode = memo(({ data, selected, onDoubleClick }: CloudSe
           <img src={nodeData.icon} alt={nodeData.name} className="w-18 h-18" />
         ) : (
           <div className={`w-10 h-10 ${getNodeColor(nodeData.id, nodeData.provider)} flex items-center justify-center shadow-md`}>
-            <span className="text-white text-base font-bold">
+            <span className="text-gray-900 text-base font-bold">
               {getNodeIcon(nodeData.id, nodeData.provider)}
             </span>
           </div>

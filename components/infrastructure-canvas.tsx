@@ -411,7 +411,7 @@ provider "aws" {
           </Button>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center">
-              <span className="text-white text-xs font-bold">A</span>
+              <span className="text-gray-900 text-xs font-bold">A</span>
             </div>
             <span className="text-sm font-medium text-gray-600">aws</span>
           </div>
@@ -552,43 +552,43 @@ provider "aws" {
             onConfigUpdate={handleConfigUpdate}
           />
         ) : (
-          <aside className="w-80 border-l border-gray-200 bg-gray-900 text-white">
+          <aside className="w-80 border-l border-gray-200 bg-gray-50 text-gray-900">
             <div className="h-full flex flex-col">
               {/* Code Editor Header */}
-              <div className="h-12 border-b border-gray-700 flex items-center justify-between px-4">
+              <div className="h-12 border-b border-gray-200 flex items-center justify-between px-4 bg-gray-50">
                 <div className="flex items-center gap-2">
                   <Code className="w-4 h-4" />
                   <Select value={activeFile} onValueChange={handleFileChange}>
-                    <SelectTrigger className="w-32 bg-gray-800 border-gray-600 text-white">
+                    <SelectTrigger className="w-32 bg-gray-100 border-gray-300 text-gray-900">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-600">
-                      <SelectItem value="main.tf" className="text-white hover:bg-gray-700">main.tf</SelectItem>
-                      <SelectItem value="variables.tf" className="text-white hover:bg-gray-700">variables.tf</SelectItem>
-                      <SelectItem value="outputs.tf" className="text-white hover:bg-gray-700">outputs.tf</SelectItem>
-                      <SelectItem value="providers.tf" className="text-white hover:bg-gray-700">providers.tf</SelectItem>
+                    <SelectContent className="bg-gray-100 border-gray-300">
+                      <SelectItem value="main.tf" className="text-gray-900 hover:bg-gray-200">main.tf</SelectItem>
+                      <SelectItem value="variables.tf" className="text-gray-900 hover:bg-gray-200">variables.tf</SelectItem>
+                      <SelectItem value="outputs.tf" className="text-gray-900 hover:bg-gray-200">outputs.tf</SelectItem>
+                      <SelectItem value="providers.tf" className="text-gray-900 hover:bg-gray-200">providers.tf</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Download className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Pin className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Play className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
 
               {/* Code Content */}
-              <div className="flex-1 overflow-auto p-4">
+              <div className="flex-1 overflow-auto p-4 bg-gray-50">
                 <textarea
                   value={terraformFiles[activeFile as keyof typeof terraformFiles]}
                   onChange={(e) => handleFileContentChange(e.target.value)}
-                  className="terraform-editor w-full h-full bg-transparent text-sm text-white resize-none border-none outline-none"
+                  className="terraform-editor w-full h-full bg-gray-50 text-sm text-gray-900 resize-none border-none outline-none"
                   placeholder="Start typing your Terraform configuration..."
                   spellCheck={false}
                 />
