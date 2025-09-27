@@ -33,7 +33,6 @@ import {
   Code,
   Download,
   History,
-  Pin,
   Play
 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
@@ -965,9 +964,6 @@ provider "aws" {
                 <div className="flex items-center gap-2">
                   <Button onClick={() => handleDownloadTerraformCode(activeFile)} variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Download className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                    <Pin className="w-4 h-4" />
                   </Button>
                   <Button 
                     variant="ghost" 
