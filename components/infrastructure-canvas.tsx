@@ -86,7 +86,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const [activeFile, setActiveFile] = useState("main.tf")
-  const [terraformFiles, setTerraformFiles] = useState({
+  const [terraformFiles, setTerraformFiles] = useState<Record<string, string>>({
     "main.tf": "",
     "variables.tf": "",
     "outputs.tf": "",
@@ -304,6 +304,26 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     })
     
     return terraformCode
+  }
+
+  const handleDownloadTerraformCode = (activeFile: string) => {
+    const content = terraformFiles[activeFile];
+    if (!content) {
+      console.error("No content found for this file:", activeFile);
+      return;
+    }
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = activeFile; // use filename
+    link.click();
+
+    // cleanup
+    URL.revokeObjectURL(url);
+
   }
 
   // Initialize Terraform files with default content
@@ -571,7 +591,7 @@ provider "aws" {
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                  <Button onClick={() => handleDownloadTerraformCode(activeFile)} variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Download className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
