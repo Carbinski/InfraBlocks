@@ -33,7 +33,6 @@ import {
   ArrowLeft,
   Code,
   Download,
-  History,
   Play,
   Pin,
   Brain,
@@ -45,7 +44,6 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { CloudServiceNode } from "./cloud-service-node"
 import { ConfigurationPanel } from "./configuration-panel"
 import { getConnectionSuggestions, validateConnection } from "./connection-validator"
-import { DeploymentStatusPanel } from "./deployment-status-panel"
 import { TerraformGenerator } from "./terraform-generator"
 import { UndoRedoControls } from "./undo-redo-controls"
 import { useCanvasHistory } from "@/hooks/use-canvas-history"
@@ -214,7 +212,6 @@ export function InfrastructureCanvas({ provider, onBack, projectId }: Infrastruc
   // Local fake progress to give the user visual feedback while deployment is running
   const [fakeProgress, setFakeProgress] = useState<number>(0)
   const [isProgressVisible, setIsProgressVisible] = useState<boolean>(true)
-  const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
   const [isAIReviewOpen, setIsAIReviewOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
@@ -888,12 +885,6 @@ provider "aws" {
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center">
-              <span className="text-gray-900 text-xs font-bold">A</span>
-            </div>
-            <span className="text-sm font-medium text-gray-600">aws</span>
-          </div>
-          <div className="flex items-center gap-2">
             <UndoRedoControls
               canUndo={canUndo}
               canRedo={canRedo}
@@ -918,15 +909,6 @@ provider "aws" {
               hasUnsavedChanges={hasUnsavedChanges()}
               lastSaved={lastSaved}
             />
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowDeploymentStatus(true)}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <History className="w-4 h-4 mr-2" />
-              Deployments
-            </Button>
           </div>
         </div>
       </header>
@@ -1214,11 +1196,6 @@ provider "aws" {
         )}
       </div>
 
-      {/* Deployment Status Panel */}
-      <DeploymentStatusPanel
-        isOpen={showDeploymentStatus}
-        onClose={() => setShowDeploymentStatus(false)}
-      />
       
       {/* AI Review Dialog */}
       <AIReviewDialog
