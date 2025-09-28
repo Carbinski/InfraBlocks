@@ -245,14 +245,14 @@ export class TerraformGenerator {
           instance_type: config.instance_type || "t3.micro",
           key_name: config.key_name || null,
           tags: {
-            Name: config.name || `${node.data.name}-instance`,
+            Name: config.name || `${node.data.name}-instance-${Date.now()}`,
             Environment: "terraform-generated",
           },
         }
 
       case "api_gateway":
         return {
-          name: config.name || "api",
+          name: config.name || `api-${Date.now()}`,
           description: config.description || "REST API",
           endpoint_configuration: config.endpoint_configuration ? {
             types: [config.endpoint_configuration],
@@ -317,7 +317,7 @@ export class TerraformGenerator {
         const useInlineCode = !config.s3_bucket && !config.s3_key
 
         return {
-          function_name: config.function_name || `${resourceName}-function`,
+          function_name: config.function_name || `${resourceName}-function-${Date.now()}`,
           runtime: config.runtime || "nodejs18.x",
           handler: "index.handler",
           ...(useInlineCode ? {
@@ -348,7 +348,7 @@ export class TerraformGenerator {
 
       case "alb":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name as string)}-alb`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-alb-${Date.now()}`,
           load_balancer_type: config.load_balancer_type || "application",
           scheme: config.scheme || "internet-facing",
           subnets: [this.getSubnetReference(node.id)],
@@ -361,7 +361,7 @@ export class TerraformGenerator {
 
       case "sqs":
         const sqsConfig: Record<string, any> = {
-          name: config.name || `${this.sanitizeName(node.data.name as string)}-queue`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-queue-${Date.now()}`,
           visibility_timeout_seconds: config.visibility_timeout_seconds || 30,
           message_retention_seconds: config.message_retention_seconds || 1209600,
           delay_seconds: config.delay_seconds || 0,
@@ -399,7 +399,7 @@ export class TerraformGenerator {
     switch (serviceId) {
       case "compute":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name as string)}-instance`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-instance-${Date.now()}`,
           machine_type: config.machine_type || "e2-micro",
           zone: config.zone || "us-central1-a",
           boot_disk: {
@@ -418,7 +418,7 @@ export class TerraformGenerator {
 
       case "storage":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name as string)}-bucket`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-bucket-${Date.now()}`,
           location: config.location || "US",
           storage_class: config.storage_class || "STANDARD",
           labels: {
@@ -428,7 +428,7 @@ export class TerraformGenerator {
 
       case "sql":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name as string)}-db`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-db-${Date.now()}`,
           database_version: config.database_version || "MYSQL_8_0",
           tier: config.tier || "db-f1-micro",
           settings: {
@@ -446,7 +446,7 @@ export class TerraformGenerator {
     switch (serviceId) {
       case "vm":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name as string)}-vm`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-vm-${Date.now()}`,
           resource_group_name: "azurerm_resource_group.main.name",
           location: config.location || "East US",
           size: config.vm_size || "Standard_B1s",
@@ -470,7 +470,7 @@ export class TerraformGenerator {
 
       case "blob":
         return {
-          name: config.name || `${this.sanitizeName(node.data.name as string)}storage`,
+          name: config.name || `${this.sanitizeName(node.data.name as string)}storage-${Date.now()}`,
           resource_group_name: "azurerm_resource_group.main.name",
           location: config.location || "East US",
           account_tier: config.account_tier || "Standard",
