@@ -7,7 +7,7 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "CloudArchitect - Visual Infrastructure Designer",
+  title: "InfraBlocks - Visual Infrastructure Designer",
   description: "Design and deploy cloud infrastructure with drag-and-drop simplicity",
   generator: "v0.app",
 }

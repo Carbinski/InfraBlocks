@@ -451,6 +451,10 @@ export function InfrastructureCanvas({ provider, onBack, projectId }: Infrastruc
     setAiAnalysis(null)
 
     try {
+      // Create an AbortController for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
       const response = await fetch('/api/ai-review', {
         method: 'POST',
         headers: {
@@ -460,7 +464,10 @@ export function InfrastructureCanvas({ provider, onBack, projectId }: Infrastruc
           terraformFiles,
           provider,
         }),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -470,7 +477,11 @@ export function InfrastructureCanvas({ provider, onBack, projectId }: Infrastruc
       setAiAnalysis(analysis)
     } catch (error) {
       console.error('AI Review Error:', error)
-      setAiReviewError(error instanceof Error ? error.message : 'Failed to analyze infrastructure')
+      if (error instanceof Error && error.name === 'AbortError') {
+        setAiReviewError('AI review timed out. Please try again with a smaller configuration.')
+      } else {
+        setAiReviewError(error instanceof Error ? error.message : 'Failed to analyze infrastructure')
+      }
     } finally {
       setIsAIReviewLoading(false)
     }

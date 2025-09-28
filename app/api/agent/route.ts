@@ -10,37 +10,35 @@ const openai = new OpenAI({
 const agentFunctions = {
   createInfrastructure: {
     name: "create_infrastructure",
-    description: "Help user design and deploy cloud infrastructure",
+    description: "Create and deploy cloud infrastructure based on user requirements",
     parameters: {
       type: "object",
       properties: {
         infrastructureType: {
           type: "string",
-          enum: ["web-app", "api-gateway", "data-pipeline", "ml-infrastructure", "microservices", "serverless"],
-          description: "Type of infrastructure to create"
+          description: "Type of infrastructure to create (e.g., web-app, single-service, data-pipeline, api, microservices, etc.)"
         },
         requirements: {
           type: "string",
-          description: "Specific requirements and constraints"
+          description: "Detailed requirements and specifications for the infrastructure"
         }
       },
-      required: ["infrastructureType"]
+      required: ["infrastructureType", "requirements"]
     }
   },
   analyzeArchitecture: {
-    name: "analyze_architecture",
-    description: "Analyze existing cloud architecture for improvements",
+    name: "analyze_architecture", 
+    description: "Analyze and provide insights on cloud architecture",
     parameters: {
       type: "object",
       properties: {
         analysisType: {
           type: "string",
-          enum: ["performance", "security", "cost", "scalability"],
-          description: "Type of analysis to perform"
+          description: "Type of analysis to perform (e.g., performance, security, cost, scalability, general review)"
         },
         currentSetup: {
           type: "string",
-          description: "Description of current architecture"
+          description: "Description of current architecture or specific areas to analyze"
         }
       },
       required: ["analysisType"]
@@ -48,18 +46,17 @@ const agentFunctions = {
   },
   troubleshootIssues: {
     name: "troubleshoot_issues",
-    description: "Help debug deployment or configuration problems",
+    description: "Help debug and resolve infrastructure problems",
     parameters: {
       type: "object",
       properties: {
         issueType: {
-          type: "string",
-          enum: ["deployment", "connectivity", "performance", "cost"],
-          description: "Type of issue being experienced"
+          type: "string", 
+          description: "Type of issue being experienced (e.g., deployment, connectivity, performance, cost, configuration)"
         },
         errorDetails: {
           type: "string",
-          description: "Specific error messages or symptoms"
+          description: "Specific error messages, symptoms, or problem description"
         }
       },
       required: ["issueType"]
@@ -67,19 +64,17 @@ const agentFunctions = {
   },
   provideBestPractices: {
     name: "provide_best_practices",
-    description: "Share cloud architecture best practices",
+    description: "Share relevant cloud architecture best practices and recommendations",
     parameters: {
       type: "object",
       properties: {
         topic: {
           type: "string",
-          enum: ["security", "cost-optimization", "high-availability", "performance"],
-          description: "Best practice topic to cover"
+          description: "Best practice topic or area of interest (e.g., security, cost-optimization, high-availability, performance, monitoring)"
         },
-        experienceLevel: {
+        context: {
           type: "string",
-          enum: ["beginner", "intermediate", "advanced"],
-          description: "User's experience level"
+          description: "Additional context about the user's situation or specific requirements"
         }
       },
       required: ["topic"]
@@ -119,51 +114,43 @@ export async function POST(request: NextRequest) {
     const messages = [
       {
         role: "system",
-        content: `You are an expert cloud infrastructure consultant and DevOps engineer. You help users with:
-
-1. Creating and deploying cloud infrastructure (AWS, GCP, Azure)
-2. Analyzing existing architectures for improvements
-3. Troubleshooting deployment and configuration issues
-4. Sharing best practices for cloud architecture
-5. NEVER output any character like * or # or anything else. Just output the text.
+        content: `You are an expert cloud infrastructure consultant and DevOps engineer. You help users with cloud infrastructure questions, architecture design, and deployment guidance.
 
 CURRENT CANVAS STATE: ${canvasContext || 'No canvas context available'}
 
-You should be helpful, technical, and provide actionable advice. When users ask questions, analyze their intent and call the appropriate function to provide structured help.
+You should be conversational, helpful, and adaptable to user needs. Respond naturally to questions and only use functions when the user clearly wants to take action (create, build, deploy infrastructure).
 
-CRITICAL: Always call functions when users mention creating, building, deploying, or designing infrastructure. Never respond with text when a function call is appropriate.
+CONVERSATION GUIDELINES:
+- Be conversational and natural in your responses
+- Answer questions directly without forcing structured outputs
+- Only call functions when users explicitly want to create or modify infrastructure
+- Feel free to discuss concepts, provide explanations, and have back-and-forth conversations
+- Use functions as tools to help users, not as rigid requirements
 
-INFRASTRUCTURE EXECUTION: When you call create_infrastructure, the infrastructure is IMMEDIATELY created and added to the user's canvas. Do NOT ask for confirmation or say you haven't created it yet. Act as if the infrastructure has been successfully created when you return the createInfrastructure data.
+WHEN TO USE FUNCTIONS:
+- create_infrastructure: When users explicitly want to CREATE, BUILD, or ADD infrastructure to their canvas
+- analyze_architecture: When users want a formal analysis of existing infrastructure  
+- troubleshoot_issues: When users need help debugging specific problems
+- provide_best_practices: When users ask for structured best practices guidance
 
-RESTRICTED SERVICE LIMITATION: For this phase of the application, you can ONLY use these 4 AWS services:
-- DynamoDB (database)
-- S3 (storage)
+WHEN TO RESPOND CONVERSATIONALLY:
+- General questions about cloud concepts
+- Explanations of how services work
+- Discussions about architecture patterns
+- Clarifying questions before taking action
+- Follow-up questions after using functions
+
+INFRASTRUCTURE CAPABILITIES:
+InfraBlocks currently supports these core AWS services:
+- DynamoDB (NoSQL database)
+- S3 (object storage) 
 - API Gateway (API management)
 - SQS (message queuing)
+- RDS (relational database)
 
-Do NOT use any other AWS services like EC2, Lambda, VPC, RDS, CloudWatch, etc. Only use the 4 services listed above.
+Additional services are planned for future releases. You can discuss any cloud service or concept, but can only create the supported services on the canvas.
 
-WHY THESE RESTRICTIONS: CodeBlocks is still in development, so we're focusing on a core set of serverless services that work well together. Explain to the user that CodeBlocks will add more services in the future but he can help with questions in the meantime
-
-Available functions:
-- create_infrastructure: Call this when users want to create, build, deploy, or design any cloud infrastructure (web apps, data pipelines, APIs, etc.) - THIS IMMEDIATELY CREATES AND ADDS TO CANVAS
-- analyze_architecture: Call this when users want to analyze or review existing cloud setups
-- troubleshoot_issues: Call this when users have problems with deployments or connectivity
-- provide_best_practices: Call this when users ask for advice or best practices
-
-IMPORTANT: When users mention infrastructure creation with complexity levels like "basic setup", "production ready", "enterprise scale", or "custom configuration", call create_infrastructure with both the infrastructure type and complexity level specified in the requirements.
-
-For individual service requests, IMMEDIATELY call create_infrastructure without asking for confirmation. For example:
-- "Create a basic web app" → call create_infrastructure with infrastructureType: "web-app" and requirements: "basic setup"
-- "Add DynamoDB" → IMMEDIATELY call create_infrastructure with infrastructureType: "single-service" and requirements: "add DynamoDB"
-- "Create one dynamo" → IMMEDIATELY call create_infrastructure with infrastructureType: "single-service" and requirements: "add DynamoDB"
-- "Just add a dynamo" → IMMEDIATELY call create_infrastructure with infrastructureType: "single-service" and requirements: "add DynamoDB"
-- "Add S3 bucket" → IMMEDIATELY call create_infrastructure with infrastructureType: "single-service" and requirements: "add S3 bucket"
-- "I need a production data pipeline" → call create_infrastructure with infrastructureType: "data-pipeline" and requirements: "production ready"
-
-When users ask to "add", "create", or mention specific services like DynamoDB, S3, API Gateway, SQS - IMMEDIATELY call create_infrastructure with single-service. Do NOT show multiple choice options for single service requests.
-
-Always call functions when users express intent to create or work with infrastructure. The infrastructure appears on their canvas immediately when you call the function.`
+Be flexible and responsive to what the user actually needs rather than forcing them into predefined categories.`
       },
       ...(conversationHistory || []).slice(-10), // Keep last 10 messages for context
       {
@@ -181,8 +168,8 @@ Always call functions when users express intent to create or work with infrastru
       messages: messages,
       tools: Object.values(agentFunctions).map(func => ({ type: "function", function: func })),
       tool_choice: "auto",
-      max_tokens: 1000,
-      temperature: 0.7
+      max_tokens: 1500,
+      temperature: 0.8
     })
 
     console.log('✅ API Route: OpenAI response received')
@@ -197,23 +184,25 @@ Always call functions when users express intent to create or work with infrastru
     // Check if the model wants to call a tool
     if (messageResponse.tool_calls && messageResponse.tool_calls.length > 0) {
       const toolCall = messageResponse.tool_calls[0]
-      const functionName = toolCall.function.name
-      const functionArgs = JSON.parse(toolCall.function.arguments || '{}')
-      console.log('🔧 API Route: Tool call:', functionName, functionArgs)
-      console.log('🔍 DEBUG: Function args parsed:', functionArgs)
+      if (toolCall.type === 'function') {
+        const functionName = toolCall.function.name
+        const functionArgs = JSON.parse(toolCall.function.arguments || '{}')
+        console.log('🔧 API Route: Tool call:', functionName, functionArgs)
+        console.log('🔍 DEBUG: Function args parsed:', functionArgs)
 
-      // Call the appropriate handler function
-      const handler = functionMap[functionName]
-      if (handler) {
-        console.log('⚙️ API Route: Executing handler:', functionName)
-        console.log('🔍 DEBUG: Handler function found:', typeof handler)
-        const result = await handler(functionArgs)
-        console.log('🎉 API Route: Handler result:', JSON.stringify(result, null, 2))
-        console.log('🔍 DEBUG: Returning handler result')
-        return NextResponse.json(result)
-      } else {
-        console.error('❌ API Route: No handler found for:', functionName)
-        console.log('🔍 DEBUG: Available handlers:', Object.keys(functionMap))
+        // Call the appropriate handler function
+        const handler = functionMap[functionName]
+        if (handler) {
+          console.log('⚙️ API Route: Executing handler:', functionName)
+          console.log('🔍 DEBUG: Handler function found:', typeof handler)
+          const result = await handler(functionArgs)
+          console.log('🎉 API Route: Handler result:', JSON.stringify(result, null, 2))
+          console.log('🔍 DEBUG: Returning handler result')
+          return NextResponse.json(result)
+        } else {
+          console.error('❌ API Route: No handler found for:', functionName)
+          console.log('🔍 DEBUG: Available handlers:', Object.keys(functionMap))
+        }
       }
     }
 
@@ -242,73 +231,51 @@ async function handleCreateInfrastructure(args: any) {
   const { infrastructureType, requirements } = args
   console.log('🔍 DEBUG: Infrastructure type:', infrastructureType, 'Requirements:', requirements)
 
-  const infrastructureTypes = {
+  // Normalize the infrastructure type for better handling
+  const typeMapping = {
     "web-app": "Web Application",
+    "web app": "Web Application", 
+    "webapp": "Web Application",
     "single-service": "Single Service",
-    "api-gateway": "API Gateway + Lambda Functions",
-    "data-pipeline": "Data Pipeline (ETL/ELT)",
-    "ml-infrastructure": "Machine Learning Infrastructure",
+    "single service": "Single Service",
+    "api-gateway": "API Gateway",
+    "api gateway": "API Gateway",
+    "api": "API Gateway",
+    "data-pipeline": "Data Pipeline",
+    "data pipeline": "Data Pipeline",
+    "etl": "Data Pipeline",
+    "ml-infrastructure": "Machine Learning Infrastructure", 
+    "ml": "Machine Learning Infrastructure",
     "microservices": "Microservices Architecture",
     "serverless": "Serverless Application"
   }
 
-  const type = infrastructureTypes[infrastructureType as keyof typeof infrastructureTypes] || infrastructureType
+  const normalizedType = typeMapping[infrastructureType.toLowerCase() as keyof typeof typeMapping] || infrastructureType
 
-  // Check if this is a single service request that should be handled directly
-  if (infrastructureType === "single-service" || (requirements && (requirements.toLowerCase().includes('add ') || requirements.toLowerCase().includes('create ')))) {
+  // Check if this is a single service request
+  const singleServiceKeywords = ['add', 'create', 'dynamodb', 'dynamo', 's3', 'api gateway', 'sqs', 'rds', 'database', 'bucket', 'table', 'queue']
+  const isSingleService = infrastructureType.toLowerCase().includes('single') || 
+                         singleServiceKeywords.some(keyword => requirements.toLowerCase().includes(keyword))
+
+  if (isSingleService) {
     console.log('⚡ Handler: Detected single service request, creating directly')
-    return handleInfrastructureDetails("Single Service", requirements || "", requirements)
+    return handleInfrastructureDetails("Single Service", requirements, requirements)
   }
 
-  // Check if requirements already specify a complexity level
-  const complexityPatterns = {
-    basic: /basic|simple/i,
-    production: /production|high.availability|monitoring/i,
-    enterprise: /enterprise|multi.region|advanced.security/i,
-    custom: /custom|specific/i
+  // Detect complexity/scale from requirements
+  const requirementsLower = requirements.toLowerCase()
+  let detectedComplexity = "Custom Configuration"
+  
+  if (requirementsLower.includes('basic') || requirementsLower.includes('simple') || requirementsLower.includes('minimal')) {
+    detectedComplexity = "Basic Setup"
+  } else if (requirementsLower.includes('production') || requirementsLower.includes('enterprise') || requirementsLower.includes('high availability')) {
+    detectedComplexity = "Production Ready"
+  } else if (requirementsLower.includes('development') || requirementsLower.includes('dev') || requirementsLower.includes('test')) {
+    detectedComplexity = "Development Setup"
   }
 
-  let detectedComplexity: string | null = null
-  if (requirements) {
-    console.log('🔍 Handler: Checking requirements for complexity:', requirements)
-    for (const [level, pattern] of Object.entries(complexityPatterns)) {
-      console.log('🔍 Handler: Testing pattern:', level, 'against:', requirements, 'result:', pattern.test(requirements))
-      if (pattern.test(requirements)) {
-        detectedComplexity = level
-        console.log('🎯 Handler: Detected complexity level:', level, 'from requirements:', requirements)
-        break
-      }
-    }
-  } else {
-    console.log('🔍 Handler: No requirements provided')
-  }
-
-  // If complexity is already specified in requirements, skip the multiple choice
-  if (detectedComplexity) {
-    const complexityMap = {
-      basic: "Serverless Setup (API Gateway + DynamoDB)",
-      production: "Production Serverless (High availability, monitoring)",
-      enterprise: "Enterprise Serverless (Multi-region, advanced security)",
-      custom: "Custom Serverless Configuration (Specific requirements)"
-    }
-
-    const complexityLabel = complexityMap[detectedComplexity as keyof typeof complexityMap]
-    console.log('⚡ Handler: Skipping multiple choice, creating infrastructure directly with:', type, complexityLabel)
-    return handleInfrastructureDetails(type, complexityLabel, requirements)
-  }
-
-  // Return multiple choice for infrastructure type selection
-  return {
-    type: 'multiple_choice',
-    content: `What type of ${type.toLowerCase()} infrastructure would you like to create?${requirements ? `\n\nRequirements: ${requirements}` : ''}`,
-    choices: [
-      "Serverless Setup (API Gateway + DynamoDB)",
-      "Production Serverless (High availability, monitoring)",
-      "Enterprise Serverless (Multi-region, advanced security)",
-      "Custom Serverless Configuration (Specific requirements)"
-    ],
-    onChoice: (choice: string) => handleInfrastructureDetails(type, choice, requirements)
-  }
+  console.log('⚡ Handler: Creating infrastructure directly with:', normalizedType, detectedComplexity)
+  return handleInfrastructureDetails(normalizedType, detectedComplexity, requirements)
 }
 
 async function handleAnalyzeArchitecture(args: any) {
@@ -452,128 +419,116 @@ What specific cost issues are you facing?`
 }
 
 async function handleProvideBestPractices(args: any) {
-  const { topic, experienceLevel } = args
+  const { topic, context } = args
 
+  // Generate best practices based on the topic
   let bestPractices = ""
+  
+  const topicLower = topic.toLowerCase()
+  
+  if (topicLower.includes("security")) {
+    bestPractices = `🔒 **Security Best Practices**
 
-  switch (topic) {
-    case "security":
-      bestPractices = `🔒 **Security Best Practices**
-
-**1. Identity & Access Management**
+**Identity & Access Management:**
 • Implement least privilege principle
-• Use IAM roles instead of access keys
+• Use IAM roles instead of access keys  
 • Enable multi-factor authentication
-• Regular access key rotation
+• Regular access reviews and key rotation
 
-**2. Network Security**
-• Use security groups to control traffic
-• Implement private subnets for sensitive resources
-• Use AWS WAF for web application protection
-• Enable VPC flow logs for monitoring
+**Network Security:**
+• Configure security groups with minimal required access
+• Use private subnets for sensitive resources
+• Implement WAF for web application protection
+• Enable flow logs for monitoring
 
-**3. Data Protection**
+**Data Protection:**
 • Encrypt data at rest and in transit
-• Use AWS KMS for key management
-• Implement proper backup strategies
-• Regular security assessments
+• Use managed encryption services (KMS)
+• Implement proper backup and recovery
+• Regular security assessments and audits`
 
-**4. Monitoring & Compliance**
-• Enable CloudTrail for API logging
-• Set up GuardDuty for threat detection
-• Use Security Hub for compliance
-• Implement incident response procedures`
-      break
+  } else if (topicLower.includes("cost") || topicLower.includes("optimization")) {
+    bestPractices = `💰 **Cost Optimization Best Practices**
 
-    case "cost-optimization":
-      bestPractices = `💰 **Cost Optimization Best Practices**
+**Resource Management:**
+• Right-size instances based on actual usage
+• Use auto-scaling to match demand
+• Implement lifecycle policies for storage
+• Regular cleanup of unused resources
 
-**1. Right Sizing**
-• Use AWS Compute Optimizer recommendations
-• Monitor and adjust instance sizes
-• Implement auto-scaling for variable loads
-• Use appropriate storage classes
+**Purchasing Strategies:**
+• Analyze usage patterns for reserved instances
+• Use savings plans for flexible compute
+• Consider spot instances for fault-tolerant workloads
+• Monitor and optimize data transfer costs
 
-**2. Reserved Instances & Savings Plans**
-• Analyze usage patterns for RI opportunities
-• Use Savings Plans for flexible compute
-• Purchase RIs for predictable workloads
-• Monitor coverage and utilization
-
-**3. Storage Optimization**
-• Use S3 lifecycle policies
-• Compress data before storage
-• Delete unused snapshots and volumes
-• Use appropriate storage tiers
-
-**4. Architectural Optimization**
+**Architectural Efficiency:**
 • Use serverless for variable workloads
+• Implement caching to reduce compute needs
+• Optimize database queries and connections
+• Regular cost reviews and optimization`
+
+  } else if (topicLower.includes("availability") || topicLower.includes("reliability")) {
+    bestPractices = `⚡ **High Availability Best Practices**
+
+**Multi-Zone Architecture:**
+• Deploy across multiple availability zones
+• Use load balancers for traffic distribution
+• Configure databases with failover capability
+• Implement cross-region replication where needed
+
+**Resilience & Recovery:**
+• Set up automated health checks
+• Implement graceful degradation
+• Create disaster recovery procedures
+• Regular backup and recovery testing
+
+**Monitoring & Response:**
+• Comprehensive monitoring and alerting
+• Automated incident response where possible
+• Clear escalation procedures
+• Post-incident reviews and improvements`
+
+  } else if (topicLower.includes("performance")) {
+    bestPractices = `📈 **Performance Optimization Best Practices**
+
+**Compute Optimization:**
+• Right-size instances for workload requirements
+• Use appropriate instance types for use case
+• Implement auto-scaling for variable demand
+• Monitor resource utilization patterns
+
+**Data & Storage Performance:**
+• Optimize database queries and indexing
+• Use appropriate storage types for access patterns
 • Implement caching strategies
+• Consider read replicas for read-heavy workloads
+
+**Network & Delivery:**
+• Use content delivery networks (CDN)
 • Optimize data transfer patterns
-• Regular cost review and optimization`
-      break
-
-    case "high-availability":
-      bestPractices = `⚡ **High Availability Best Practices**
-
-**1. Multi-AZ Architecture**
-• Deploy across multiple Availability Zones
-• Use ELB for traffic distribution
-• Configure RDS with Multi-AZ failover
-• Implement cross-region replication
-
-**2. Auto Scaling & Load Balancing**
-• Use Auto Scaling Groups for EC2
-• Configure health checks for automatic failover
-• Implement load balancer health monitoring
-• Use Route 53 for DNS failover
-
-**3. Data Backup & Recovery**
-• Enable automated backups
-• Test disaster recovery procedures
-• Use S3 cross-region replication
-• Implement regular snapshot schedules
-
-**4. Monitoring & Alerting**
-• Set up comprehensive monitoring
-• Implement alerting for key metrics
-• Use distributed tracing
-• Create incident response runbooks`
-      break
-
-    case "performance":
-      bestPractices = `📈 **Performance Optimization Best Practices**
-
-**1. Compute Optimization**
-• Right-size instances based on workload
-• Use auto-scaling for variable demand
-• Implement load balancing
-• Choose appropriate instance types
-
-**2. Database Performance**
-• Optimize queries and implement indexing
-• Use read replicas for read-heavy workloads
 • Implement connection pooling
-• Monitor query performance
+• Monitor latency and throughput metrics`
 
-**3. Network Performance**
-• Use CloudFront for global content delivery
-• Implement caching strategies
-• Optimize network architecture
-• Monitor latency and throughput
+  } else {
+    // General best practices
+    bestPractices = `🏗️ **General Cloud Best Practices for ${topic}**
 
-**4. Application Performance**
-• Implement caching at multiple layers
-• Use CDN for static assets
-• Optimize database connections
-• Monitor application performance metrics`
-      break
+**Architecture Principles:**
+• Design for scalability and flexibility
+• Implement proper monitoring and logging
+• Use automation where possible
+• Follow security-first approach
+
+**Operational Excellence:**
+• Document your architecture and processes
+• Implement Infrastructure as Code
+• Regular reviews and optimization
+• Continuous learning and improvement`
   }
 
-  if (experienceLevel === "beginner") {
-    bestPractices += "\n\n**Beginner Tips:** Start with basic monitoring and implement one optimization at a time."
-  } else if (experienceLevel === "advanced") {
-    bestPractices += "\n\n**Advanced Tips:** Consider implementing automated optimization and predictive scaling."
+  if (context) {
+    bestPractices += `\n\n**Context-Specific Considerations:**\n${context}\n\nThese recommendations should be adapted to your specific situation and requirements.`
   }
 
   return {
@@ -711,6 +666,27 @@ function generateInfrastructureComponents(type: string, complexity: string): any
           message_retention_period: 345600,
           receive_message_wait_time_seconds: 0,
           visibility_timeout_seconds: 30
+        }
+      })
+    } else if (lowerRequirements.includes('rds') || lowerRequirements.includes('database')) {
+      components.push({
+        id: "rds-instance-" + Date.now(),
+        name: "RDS Database",
+        provider: "aws",
+        service: "rds",
+        position: { x: Math.random() * 400 + 100, y: Math.random() * 200 + 100 },
+        config: {
+          engine: "mysql",
+          engine_version: "8.0",
+          instance_class: "db.t3.micro",
+          allocated_storage: 20,
+          storage_type: "gp2",
+          db_name: "mydatabase",
+          username: "admin",
+          password: "changeme123",
+          backup_retention_period: 7,
+          backup_window: "03:00-04:00",
+          maintenance_window: "sun:04:00-sun:05:00"
         }
       })
     }

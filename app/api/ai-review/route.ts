@@ -21,76 +21,66 @@ export async function POST(request: NextRequest) {
       .map(([filename, content]) => `## ${filename}\n\`\`\`hcl\n${content}\n\`\`\``)
       .join('\n\n');
 
-    const prompt = `Analyze ONLY the provided Terraform configuration. Base your analysis strictly on what is visible in the code.
+    const prompt = `Review this Terraform configuration and provide a quick analysis:
 
 ${terraformContent}
 
-CRITICAL RULES:
-- Analyze ONLY what you can see in the provided files
-- Do NOT assume missing configurations exist elsewhere
-- Do NOT make recommendations about files/resources not shown
-- If information is missing, state "insufficient information" rather than assuming
-- BE BRUTALLY HONEST - don't sugarcoat shit practices, poor architecture, or amateur mistakes
-- Score aggressively - mediocre code gets mediocre scores, bad code gets shit scores
-- Call out expensive, inefficient, or reckless configurations without mercy
-- For cost estimates, be alarmingly direct about wasteful spending
-
-Respond with ONLY valid JSON in this exact structure:
-
+Respond with valid JSON only:
 {
   "overallScore": <number 0-100>,
-  "summary": "<string: what you can observe from the provided files only>",
-  "strengths": ["<string: only visible strengths>"],
+  "summary": "<brief summary>",
+  "strengths": ["<strength1>", "<strength2>"],
   "issues": [
     {
       "severity": "<high|medium|low>",
-      "category": "<security|performance|cost|best-practices|syntax>",
-      "description": "<string: only issues you can see>",
-      "recommendation": "<string: specific to visible code>",
-      "file": "<string: actual filename>",
-      "line": <number: actual line number>
+      "category": "<security|performance|cost|best-practices>",
+      "description": "<issue description>",
+      "recommendation": "<fix suggestion>",
+      "file": "<filename>",
+      "line": <line_number>
     }
   ],
   "recommendations": [
     {
       "category": "<security|performance|cost|best-practices>",
-      "title": "<string>",
-      "description": "<string: based only on visible code>",
+      "title": "<title>",
+      "description": "<description>",
       "impact": "<high|medium|low>"
     }
   ],
   "costOptimization": {
-    "estimatedMonthlyCost": "<string: 'Unable to estimate' if insufficient resource details>",
-    "suggestions": ["<string: only if you can see specific inefficiencies>"]
+    "estimatedMonthlyCost": "<cost estimate or 'Unable to estimate'>",
+    "suggestions": ["<suggestion1>", "<suggestion2>"]
   },
   "securityAnalysis": {
     "securityScore": <number 0-100>,
-    "findings": ["<string: only security issues you can actually see>"]
+    "findings": ["<finding1>", "<finding2>"]
   }
-}
+}`;
 
-JSON formatting rules:
-- Valid JSON only, no markdown or explanations
-- Use "Unable to determine" or "Insufficient information" when you cannot see relevant details
-- Empty arrays [] are acceptable when no issues/recommendations are visible
-- Be specific about file names and line numbers from the actual code provided`;
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('OpenAI request timeout')), 20000); // 20 second timeout
+    });
 
-    const completion = await openai.chat.completions.create({
+    const completionPromise = openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
-          content: "You are a ruthless Terraform code reviewer who doesn't pull punches. Be brutally honest about bad practices, wasteful spending, and amateur mistakes. You MUST respond with valid JSON only. No explanations, no markdown, no additional text. Just pure JSON matching the exact schema provided."
+          content: "You are a Terraform code reviewer. Analyze the code and respond with valid JSON only. Be direct and practical in your feedback."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.1,
-      max_tokens: 3000,
+      temperature: 0.3,
+      max_tokens: 1500,
       response_format: { type: "json_object" },
     });
+
+    const completion = await Promise.race([completionPromise, timeoutPromise]) as any;
 
     const response = completion.choices[0]?.message?.content;
     

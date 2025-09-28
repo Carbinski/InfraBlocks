@@ -22,7 +22,6 @@ import {
   Loader2,
   Shield,
   TrendingUp,
-  X,
   Brain,
   AlertCircle,
   Lightbulb,
@@ -107,14 +106,31 @@ const LoadingState = () => (
               AI Review in Progress
             </DialogTitle>
             <DialogDescription>
-              Analyzing your Terraform configuration...
+              Analyzing your Terraform configuration for security, cost, and best practices...
             </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
             <div className="flex items-center justify-center py-8">
-              <div className="text-center space-y-2">
+              <div className="text-center space-y-4">
                 <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-500" />
-                <p className="text-sm text-gray-600">AI is reviewing your infrastructure</p>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700">AI is reviewing your infrastructure</p>
+                  <p className="text-xs text-gray-500">This usually takes 10-20 seconds</p>
+                </div>
+                <div className="flex items-center justify-center space-x-4 text-xs text-gray-400">
+                  <div className="flex items-center gap-1">
+                    <Shield className="w-3 h-3" />
+                    <span>Security</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="w-3 h-3" />
+                    <span>Cost</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" />
+                    <span>Performance</span>
+                  </div>
+                </div>
               </div>
             </div>
         </div>
@@ -287,14 +303,9 @@ const AnalysisContent = ({ analysis, onClose }: { analysis: AIAnalysis; onClose:
     return (
         <>
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Brain className="w-5 h-5" />
-                  AI Infrastructure Review
-                </span>
-                <Button variant="ghost" size="sm" onClick={onClose}>
-                  <X className="w-4 h-4" />
-                </Button>
+              <DialogTitle className="flex items-center gap-2">
+                <Brain className="w-5 h-5" />
+                AI Infrastructure Review
               </DialogTitle>
               <DialogDescription>
                 Comprehensive analysis of your Terraform configuration

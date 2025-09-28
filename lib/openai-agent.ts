@@ -5,37 +5,35 @@ import { getCanvasInfrastructureSummary } from './infrastructure-manager'
 export const agentFunctions = {
   createInfrastructure: {
     name: "create_infrastructure",
-    description: "Help user design and deploy cloud infrastructure",
+    description: "Create and deploy cloud infrastructure based on user requirements",
     parameters: {
       type: "object",
       properties: {
         infrastructureType: {
           type: "string",
-          enum: ["web-app", "single-service", "api-gateway", "data-pipeline", "ml-infrastructure", "microservices", "serverless"],
-          description: "Type of infrastructure to create"
+          description: "Type of infrastructure to create (e.g., web-app, single-service, data-pipeline, api, microservices, etc.)"
         },
         requirements: {
           type: "string",
-          description: "Specific requirements and constraints"
+          description: "Detailed requirements and specifications for the infrastructure"
         }
       },
-      required: ["infrastructureType"]
+      required: ["infrastructureType", "requirements"]
     }
   },
   analyzeArchitecture: {
-    name: "analyze_architecture",
-    description: "Analyze existing cloud architecture for improvements",
+    name: "analyze_architecture", 
+    description: "Analyze and provide insights on cloud architecture",
     parameters: {
       type: "object",
       properties: {
         analysisType: {
           type: "string",
-          enum: ["performance", "security", "cost", "scalability"],
-          description: "Type of analysis to perform"
+          description: "Type of analysis to perform (e.g., performance, security, cost, scalability, general review)"
         },
         currentSetup: {
           type: "string",
-          description: "Description of current architecture"
+          description: "Description of current architecture or specific areas to analyze"
         }
       },
       required: ["analysisType"]
@@ -43,18 +41,17 @@ export const agentFunctions = {
   },
   troubleshootIssues: {
     name: "troubleshoot_issues",
-    description: "Help debug deployment or configuration problems",
+    description: "Help debug and resolve infrastructure problems",
     parameters: {
       type: "object",
       properties: {
         issueType: {
-          type: "string",
-          enum: ["deployment", "connectivity", "performance", "cost"],
-          description: "Type of issue being experienced"
+          type: "string", 
+          description: "Type of issue being experienced (e.g., deployment, connectivity, performance, cost, configuration)"
         },
         errorDetails: {
           type: "string",
-          description: "Specific error messages or symptoms"
+          description: "Specific error messages, symptoms, or problem description"
         }
       },
       required: ["issueType"]
@@ -62,19 +59,17 @@ export const agentFunctions = {
   },
   provideBestPractices: {
     name: "provide_best_practices",
-    description: "Share cloud architecture best practices",
+    description: "Share relevant cloud architecture best practices and recommendations",
     parameters: {
       type: "object",
       properties: {
         topic: {
           type: "string",
-          enum: ["security", "cost-optimization", "high-availability", "performance"],
-          description: "Best practice topic to cover"
+          description: "Best practice topic or area of interest (e.g., security, cost-optimization, high-availability, performance, monitoring)"
         },
-        experienceLevel: {
+        context: {
           type: "string",
-          enum: ["beginner", "intermediate", "advanced"],
-          description: "User's experience level"
+          description: "Additional context about the user's situation or specific requirements"
         }
       },
       required: ["topic"]
