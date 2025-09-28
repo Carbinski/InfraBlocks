@@ -130,6 +130,8 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus | null>(null)
   const [isDeploying, setIsDeploying] = useState(false)
   const [deploymentError, setDeploymentError] = useState<string | null>(null)
+  // Local fake progress to give the user visual feedback while deployment is running
+  const [fakeProgress, setFakeProgress] = useState<number>(0)
   const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
   const [isAIReviewOpen, setIsAIReviewOpen] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
@@ -475,14 +477,28 @@ variable "environment" {
 `
         }
         
-        // Generate outputs.tf using the dedicated method
-        const generatedOutputsTf = await terraformGenerator.generateOutputsFile()
-        outputsTf = generatedOutputsTf.trim() ? generatedOutputsTf : `# Outputs for your infrastructure
+        // Generate outputs.tf from the generator output
+        if (Object.keys(output.outputs).length > 0) {
+          outputsTf = "# Outputs\n"
+          Object.entries(output.outputs).forEach(([name, config]) => {
+            outputsTf += `output "${name}" {\n`
+            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
+              if (typeof value === "string") {
+                outputsTf += `  ${key} = "${value}"\n`
+              } else {
+                outputsTf += `  ${key} = ${value}\n`
+              }
+            })
+            outputsTf += "}\n\n"
+          })
+        } else {
+          outputsTf = `# Outputs for your infrastructure
 output "resources_created" {
   description = "Number of resources created"
   value       = ${nodes.length}
 }
 `
+        }
         
         // Generate providers.tf
         providersTf = terraformGenerator.generateProviderBlock()
@@ -655,6 +671,40 @@ provider "aws" {
       clearInterval(pollInterval)
     }, 600000)
   }
+
+  // Fake progress updater: slowly increases a local progress value while deploying so
+  // user sees activity even before we have real status updates. When real progress
+  // is available it will sync to the real value.
+  useEffect(() => {
+    let timer: number | undefined
+
+    if (isDeploying) {
+      // start with a small visible amount
+      setFakeProgress((p) => (p > 0 ? p : 5))
+
+      timer = window.setInterval(() => {
+        setFakeProgress((prev) => {
+          // don't jump past 95% while waiting for real status
+          const next = prev + Math.random() * 6
+          return Math.min(95, next)
+        })
+      }, 1200)
+    } else {
+      // reset when not deploying
+      setFakeProgress(0)
+    }
+
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [isDeploying])
+
+  // Sync fakeProgress to real deployment progress when available
+  useEffect(() => {
+    if (deploymentStatus && typeof deploymentStatus.progress === 'number') {
+      setFakeProgress(deploymentStatus.progress)
+    }
+  }, [deploymentStatus])
 
   // Update all Terraform files when nodes change
   const updateAllTerraformFiles = async () => {
@@ -948,8 +998,23 @@ provider "aws" {
               {/* Code Content */}
               <div className="flex-1 overflow-auto p-4 bg-gray-50 flex flex-col">
                 {/* Deployment Status */}
-                {(isDeploying || deploymentStatus || deploymentError) && (
-                  <div className="mb-4 p-3 bg-white rounded-lg border">
+                {(isDeploying || deploymentStatus || deploymentError || fakeProgress > 0) && (
+                  <div className="mb-4">
+                    {/* Progress bar (fake/approximate) placed above the status box */}
+                    {(isDeploying || fakeProgress > 0) && (
+                      <div className="mb-2">
+                        <div className="text-xs text-gray-600 mb-1">Deployment progress</div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-700"
+                            style={{ width: `${Math.min(100, Math.max(0, Math.round(fakeProgress)))}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">{Math.round(fakeProgress)}%</div>
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-white rounded-lg border">
                     {isDeploying && deploymentStatus && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -997,8 +1062,9 @@ provider "aws" {
                       </div>
                     )}
                   </div>
+                </div>
                 )}
-                
+
                 <textarea
                   value={terraformFiles[activeFile as keyof typeof terraformFiles]}
                   onChange={(e) => handleFileContentChange(e.target.value)}
