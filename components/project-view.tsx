@@ -3,6 +3,7 @@
 
 import { InfrastructureCanvas } from "@/components/infrastructure-canvas"
 import { ProviderSelection } from "@/components/provider-selection"
+import { ReactFlowProvider } from "@xyflow/react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +23,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { ArrowLeft, MoreHorizontal, RefreshCw, Settings, Share, Trash2 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 interface Project {
   id: string
@@ -40,6 +41,18 @@ interface ProjectViewProps {
   onBack: () => void
   onUpdateProject: (project: Project) => void
   onDeleteProject: (projectId: string) => void
+}
+
+// Simple wrapper - canvas now handles AI infrastructure directly
+function InfrastructureCanvasWrapper({ provider, onBack }: { provider: "aws" | "gcp" | "azure", onBack: () => void }) {
+  console.log('🎨 InfrastructureCanvasWrapper: Rendering canvas with provider:', provider)
+
+  return (
+    <InfrastructureCanvas
+      provider={provider}
+      onBack={onBack}
+    />
+  )
 }
 
 export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject }: ProjectViewProps) {
@@ -124,10 +137,15 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
           </main>
         </div>
       ) : (
-        <InfrastructureCanvas
-          provider={selectedProvider!}
-          onBack={handleBackToProviderSelection}
-        />
+        <>
+          {console.log('🎨 ProjectView: Rendering canvas with provider:', selectedProvider)}
+          <ReactFlowProvider>
+            <InfrastructureCanvasWrapper
+              provider={selectedProvider!}
+              onBack={handleBackToProviderSelection}
+            />
+          </ReactFlowProvider>
+        </>
       )}
 
       {/* Delete Confirmation Dialog */}

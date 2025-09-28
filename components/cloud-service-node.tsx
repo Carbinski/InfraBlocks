@@ -75,7 +75,7 @@ export const CloudServiceNode = memo(({ data, selected, onDoubleClick }: CloudSe
   }
 
   const isImageIcon = (icon: string) => {
-    return icon.startsWith('/') && (icon.endsWith('.png') || icon.endsWith('.svg') || icon.endsWith('.jpg') || icon.endsWith('.jpeg'))
+    return icon && typeof icon === 'string' && icon.startsWith('/') && (icon.endsWith('.png') || icon.endsWith('.svg') || icon.endsWith('.jpg') || icon.endsWith('.jpeg'))
   }
 
   const getNodeColor = (serviceId: string, provider: string) => {

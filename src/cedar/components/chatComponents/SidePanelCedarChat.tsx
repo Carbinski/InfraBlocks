@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { useCedarStore } from '@/lib/utils';
@@ -46,6 +46,7 @@ export const SidePanelCedarChat: React.FC<SidePanelCedarChatProps> = ({
 	// Get showChat state and setShowChat from store
 	const showChat = useCedarStore((state) => state.showChat);
 	const setShowChat = useCedarStore((state) => state.setShowChat);
+	const messages = useCedarStore((state) => state.messages);
 
 	return (
 		<>
