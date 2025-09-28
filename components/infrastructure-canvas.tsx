@@ -211,6 +211,9 @@ export function InfrastructureCanvas({ provider, onBack, projectId }: Infrastruc
   const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus | null>(null)
   const [isDeploying, setIsDeploying] = useState(false)
   const [deploymentError, setDeploymentError] = useState<string | null>(null)
+  // Local fake progress to give the user visual feedback while deployment is running
+  const [fakeProgress, setFakeProgress] = useState<number>(0)
+  const [isProgressVisible, setIsProgressVisible] = useState<boolean>(true)
   const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
   const [isAIReviewOpen, setIsAIReviewOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -401,38 +404,6 @@ export function InfrastructureCanvas({ provider, onBack, projectId }: Infrastruc
     setSelectedNodes(selectedNodesArray.map(node => node.id))
     setSelectedEdges(selectedEdgesArray.map(edge => edge.id))
   }, [])
-
-  // Test function to manually create a connection
-  const testConnection = () => {
-    if (nodes.length >= 2) {
-      const testEdge = {
-        id: `test-${Date.now()}`,
-        source: nodes[0].id,
-        target: nodes[1].id,
-        type: 'smoothstep',
-        animated: false,
-        style: { stroke: '#ff0000', strokeWidth: 5 },
-        data: {
-          relationship: "test_connection",
-          description: "Test connection",
-          bidirectional: false,
-        },
-      }
-      console.log('Creating test connection:', testEdge)
-      console.log('Current nodes:', nodes)
-      console.log('Current edges before:', edges)
-      
-      // Calculate the new state before applying it
-      const updatedEdges = addEdge(testEdge, edges)
-      
-      // Save state with the complete new state
-      if (!isSyncingFromHistory.current) {
-        saveState(nodes, updatedEdges, 'test_connect')
-      }
-      
-      setEdges(updatedEdges)
-    }
-  }
 
 
   const suggestions = getConnectionSuggestions(nodes, provider!)
@@ -730,9 +701,12 @@ provider "aws" {
       return
     }
 
-    setIsDeploying(true)
-    setDeploymentError(null)
-    setDeploymentStatus(null)
+  // Reset progress UI when starting a new deployment
+  setFakeProgress(0)
+  setIsProgressVisible(true)
+  setDeploymentError(null)
+  setDeploymentStatus(null)
+  setIsDeploying(true)
 
     try {
       const deploymentRequest = {
@@ -786,6 +760,51 @@ provider "aws" {
       clearInterval(pollInterval)
     }, 600000)
   }
+
+  // Fake progress updater: slowly increases a local progress value while deploying so
+  // user sees activity even before we have real status updates. When real progress
+  // is available it will sync to the real value.
+  useEffect(() => {
+    let timer: number | undefined
+
+    if (isDeploying) {
+      // start with a small visible amount
+      setFakeProgress((p) => (p > 0 ? p : 5))
+
+      timer = window.setInterval(() => {
+        setFakeProgress((prev) => {
+          // don't jump past 95% while waiting for real status
+          const next = prev + Math.random() * 6
+          return Math.min(95, next)
+        })
+      }, 1200)
+    } else {
+      // reset when not deploying
+      setFakeProgress(0)
+    }
+
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [isDeploying])
+
+  // Sync fakeProgress to real deployment progress when available
+  useEffect(() => {
+    if (!deploymentStatus) return
+
+    if (typeof deploymentStatus.progress === 'number') {
+      setFakeProgress(deploymentStatus.progress)
+    }
+
+    // When deployment finishes, clear the progress and hide the bar after a short delay
+    if (deploymentStatus.status === 'completed' || deploymentStatus.status === 'failed' || deploymentStatus.status === 'cancelled') {
+      const t = window.setTimeout(() => {
+        setFakeProgress(0)
+        setIsProgressVisible(false)
+      }, 800)
+      return () => clearTimeout(t)
+    }
+  }, [deploymentStatus])
 
   // Update all Terraform files when nodes change
   const updateAllTerraformFiles = async () => {
@@ -945,7 +964,7 @@ provider "aws" {
               </div>
             </div>
 
-            {/* Node Count and Test Button */}
+            {/* Node and edge summary */}
             <div className="mt-auto pt-4 border-t border-gray-200">
               <div className="text-xs text-gray-500 mb-2">
                 Number of nodes: {nodes.length}
@@ -967,16 +986,6 @@ provider "aws" {
                     Delete Selected
                   </Button>
                 </div>
-              )}
-              {nodes.length >= 2 && (
-                <Button 
-                  onClick={testConnection}
-                  size="sm"
-                  variant="outline"
-                  className="w-full text-xs"
-                >
-                  Test Connection
-                </Button>
               )}
             </div>
           </div>
@@ -1007,6 +1016,9 @@ provider "aws" {
                   className="bg-gray-50"
                   connectionLineStyle={{ stroke: "#666", strokeWidth: 2 }}
                   defaultEdgeOptions={defaultEdgeOptions}
+                  // Increase the connection radius so users don't have to be pixel-perfect when
+                  // starting/ending connections on small handles.
+                  connectionRadius={40}
                   snapToGrid={true}
                   snapGrid={[20, 20]}
                   panOnDrag={true}
@@ -1102,8 +1114,32 @@ provider "aws" {
               {/* Code Content */}
               <div className="flex-1 overflow-auto p-4 bg-gray-50 flex flex-col">
                 {/* Deployment Status */}
-                {(isDeploying || deploymentStatus || deploymentError) && (
-                  <div className="mb-4 p-3 bg-white rounded-lg border">
+                {(isDeploying || deploymentStatus || deploymentError || fakeProgress > 0) && (
+                  <div className="mb-4">
+                    {/* Progress bar (fake/approximate) placed above the status box */}
+                    {(isProgressVisible && (isDeploying || fakeProgress > 0)) && (
+                      <div className="mb-2 relative">
+                        <div className="absolute top-0 right-0">
+                          <button
+                            className="text-xs text-gray-500 hover:text-gray-700 p-1"
+                            onClick={() => setIsProgressVisible(false)}
+                            aria-label="Close progress"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <div className="text-xs text-gray-600 mb-1">Deployment progress</div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-700"
+                            style={{ width: `${Math.min(100, Math.max(0, Math.round(fakeProgress)))}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">{Math.round(fakeProgress)}%</div>
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-white rounded-lg border">
                     {isDeploying && deploymentStatus && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -1151,8 +1187,9 @@ provider "aws" {
                       </div>
                     )}
                   </div>
+                </div>
                 )}
-                
+
                 <textarea
                   value={terraformFiles[activeFile as keyof typeof terraformFiles]}
                   onChange={(e) => handleFileContentChange(e.target.value)}
@@ -1217,4 +1254,3 @@ provider "aws" {
     </div>
   )
 }
-
