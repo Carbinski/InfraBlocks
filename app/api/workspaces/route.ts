@@ -145,9 +145,25 @@ function generateMainTfOnly(resources: any[]): string {
   
   resources.forEach((resource) => {
     content += `resource "${resource.type}" "${resource.name}" {\n`
-    
+
+    // Handle DynamoDB attributes specially
+    if (resource.type === "aws_dynamodb_table" && (resource.config as any)._attributes) {
+      // Add attributes as separate blocks
+      const attributes = (resource.config as any)._attributes
+      attributes.forEach((attr: any) => {
+        content += `  attribute {\n`
+        content += `    name = "${attr.name}"\n`
+        content += `    type = "${attr.type}"\n`
+        content += `  }\n`
+      })
+    }
+
     // Format resource configuration
     Object.entries(resource.config).forEach(([key, value]) => {
+      // Skip internal fields that are handled specially
+      if (key === "_attributes") {
+        return
+      }
       if (value === null || value === undefined) {
         return
       }

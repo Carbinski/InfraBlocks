@@ -90,6 +90,12 @@ export class TerraformGenerator {
         }
       }
 
+      // Handle DynamoDB attribute definitions specially
+      if (node.data.id === 'dynamodb' && (config as any)._attributes) {
+        // DynamoDB attributes are handled in the resource generation, not as additional resources
+        // The _attributes are processed in generateMainTfOnly
+      }
+
       if (node.data.id === 'lambda') {
         // Add IAM role for Lambda function
         const resourceName = this.sanitizeName((node.data.name as string) || (node.data.id as string))
@@ -225,11 +231,15 @@ export class TerraformGenerator {
         }
 
       case "dynamodb":
-        return {
+        const hashKey = config.hash_key || "id"
+        const rangeKey = config.range_key
+
+        // Build attribute definitions as separate blocks
+        const dynamodbConfig: any = {
           name: config.table_name || `${this.sanitizeName(node.data.name as string)}-table`,
           billing_mode: config.billing_mode || "PAY_PER_REQUEST",
-          hash_key: config.hash_key || "id",
-          ...(config.range_key && { range_key: config.range_key }),
+          hash_key: hashKey,
+          ...(rangeKey && { range_key: rangeKey }),
           ...(config.billing_mode === "PROVISIONED" && {
             read_capacity: Number.parseInt(config.read_capacity) || 5,
             write_capacity: Number.parseInt(config.write_capacity) || 5,
@@ -248,6 +258,23 @@ export class TerraformGenerator {
             Environment: "terraform-generated",
           },
         }
+
+        // Add attribute definitions as special blocks
+        dynamodbConfig._attributes = [
+          {
+            name: hashKey,
+            type: "S", // String type
+          }
+        ]
+
+        if (rangeKey) {
+          dynamodbConfig._attributes.push({
+            name: rangeKey,
+            type: "S", // String type
+          })
+        }
+
+        return dynamodbConfig
 
       case "s3":
         return {
@@ -746,6 +773,11 @@ resource "azurerm_resource_group" "main" {
     const spaces = "  ".repeat(indent)
 
     Object.entries(config).forEach(([key, value]) => {
+      // Skip internal fields that are handled specially
+      if (key === "_attributes") {
+        return
+      }
+
       if (value === null || value === undefined) {
         return
       }
