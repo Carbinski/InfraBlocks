@@ -34,6 +34,24 @@ next-env.d.ts
 
 # terraform
 terraform-workspaces/
+
+*.tfplan
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfstate.d/
+.terraform.lock.hcl
+.terraform.tfstate.lock.info
+*.tfvars
+!*.tfvars.example
+
+# terraform logs and temporary files
+terraform.log
+terraform.log.*
+*.log
+
+ignore
+
 *.tfstate
 *.tfstate.*
 .terraform/
@@ -45,3 +63,4 @@ terraform.tfplan.*
 # local terraform files
 .terraform.lock.hcl
 *.tfvars
+
