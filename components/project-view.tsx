@@ -15,13 +15,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreHorizontal, RefreshCw, Settings, Share, Trash2 } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import { useState } from "react"
 
 interface Project {
@@ -44,7 +38,7 @@ interface ProjectViewProps {
 
 export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject }: ProjectViewProps) {
   const [selectedProvider, setSelectedProvider] = useState<"aws" | "gcp" | "azure" | null>(project.provider || null)
-  const [showCanvas, setShowCanvas] = useState(false)
+  const [showCanvas, setShowCanvas] = useState(!!project.provider)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const handleProviderSelect = (provider: "aws" | "gcp" | "azure") => {
@@ -120,13 +114,17 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
               <div className="max-w-4xl mx-auto">
                 <ProviderSelection onProviderSelect={handleProviderSelect} />
               </div>
-            ) : null}
+            ) : (
+              <div className="max-w-4xl mx-auto text-center py-8">
+                <p className="text-muted-foreground">Loading infrastructure canvas...</p>
+              </div>
+            )}
           </main>
         </div>
       ) : (
         <InfrastructureCanvas
           provider={selectedProvider!}
-          onBack={handleBackToProviderSelection}
+          onBack={onBack}
         />
       )}
 
