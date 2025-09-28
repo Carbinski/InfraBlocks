@@ -202,45 +202,27 @@ export function ConfigurationPanel({
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-xs text-green-600 font-medium">AUTO SAVED</div>
+          {/* Left: icon + title/description */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm bg-white border border-gray-200">
+              <img
+                src={getNodeIconPath(nodeData.id, nodeData.provider)}
+                alt={`${nodeData.id} icon`}
+                className="w-6 h-6"
+              />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-sm text-gray-900 truncate">{nodeData.name}</h3>
+              <p className="text-xs text-gray-500">{nodeData.terraformType}</p>
+            </div>
+          </div>
+
+          {/* Right: close button */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900">
-              <Undo className="w-3 h-3" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-              onClick={onSave}
-              disabled={!onSave}
-            >
-              <Save className="w-3 h-3" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900">
-              <Info className="w-3 h-3" />
-            </Button>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900" onClick={onClose}>
               <X className="w-3 h-3" />
             </Button>
           </div>
-        </div>
-
-        {/* Node Title */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm bg-white border border-gray-200">
-            <img 
-              src={getNodeIconPath(nodeData.id, nodeData.provider)} 
-              alt={`${nodeData.id} icon`}
-              className="w-6 h-6"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm text-gray-900 truncate">{nodeData.name}</h3>
-            <p className="text-xs text-gray-500">{nodeData.terraformType}</p>
-          </div>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900">
-            <MoreHorizontal className="w-3 h-3" />
-          </Button>
         </div>
 
         {/* Search */}
@@ -260,7 +242,7 @@ export function ConfigurationPanel({
           {/* Required Parameters Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-sm text-gray-900">Required parameters</h4>
+              <h4 className="font-medium text-sm text-gray-900">Service Parameters</h4>
               <div className="w-4 h-4 bg-gray-100 rounded flex items-center justify-center">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
               </div>

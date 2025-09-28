@@ -34,7 +34,6 @@ import {
   MoreHorizontal,
   Plus,
   Settings,
-  Shield,
   Trash2
 } from "lucide-react"
 import { useEffect, useState } from "react"
