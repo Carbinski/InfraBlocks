@@ -173,6 +173,17 @@ export function useCanvasHistory() {
     setCurrentIndex(0)
   }, [])
 
+  const initializeHistory = useCallback((nodes: Node[], edges: Edge[]) => {
+    const initialState: CanvasState = {
+      nodes: JSON.parse(JSON.stringify(nodes)), // Deep clone
+      edges: JSON.parse(JSON.stringify(edges)), // Deep clone
+      timestamp: Date.now(),
+      action: 'initial'
+    }
+    setHistory([initialState])
+    setCurrentIndex(0)
+  }, [])
+
   const getCurrentState = useCallback((): CanvasState | null => {
     if (currentIndex >= 0 && currentIndex < history.length) {
       return history[currentIndex]
@@ -200,6 +211,7 @@ export function useCanvasHistory() {
     redo,
     saveState,
     clearHistory,
+    initializeHistory,
     getCurrentState,
     debugHistory,
     historyLength: history.length,

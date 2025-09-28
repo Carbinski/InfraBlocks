@@ -72,6 +72,7 @@ export type CloudProvider = "aws" | "gcp" | "azure"
 export interface InfrastructureCanvasProps {
   provider: CloudProvider
   onBack: () => void
+  projectId?: string | null
 }
 
 // Node and Edge Type Definitions

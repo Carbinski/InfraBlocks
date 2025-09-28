@@ -112,6 +112,36 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
                 </Badge>
               )}
             </div>
+            
+            {/* Three dots menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Project Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Share className="w-4 h-4 mr-2" />
+                  Share Project
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </header>
 
           {/* Project Content */}
@@ -127,6 +157,7 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
         <InfrastructureCanvas
           provider={selectedProvider!}
           onBack={handleBackToProviderSelection}
+          projectId={project.id}
         />
       )}
 

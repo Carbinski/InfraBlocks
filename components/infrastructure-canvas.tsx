@@ -36,7 +36,9 @@ import {
   History,
   Play,
   Pin,
-  Brain
+  Brain,
+  Save,
+  Clock
 } from "lucide-react"
 import GlassyPaneContainer from '@/src/cedar/components/containers/GlassyPaneContainer'
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
@@ -47,8 +49,10 @@ import { DeploymentStatusPanel } from "./deployment-status-panel"
 import { TerraformGenerator } from "./terraform-generator"
 import { UndoRedoControls } from "./undo-redo-controls"
 import { useCanvasHistory } from "@/hooks/use-canvas-history"
+import { ProjectCanvasUtils } from "@/lib/project-canvas-utils"
 
 import { AIReviewDialog } from "./ai-review-dialog"
+import { SaveStatusIndicator } from "./save-status-indicator"
 
 
 const createNodeTypes = (onNodeDoubleClick: (nodeData: any) => void) => ({
@@ -73,15 +77,52 @@ const defaultEdgeOptions = {
 let nodeId = 0
 const getId = () => `node_${nodeId++}`
 
-export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasProps) {
+export function InfrastructureCanvas({ provider, onBack, projectId }: InfrastructureCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([])
   
   // Initialize undo/redo functionality
-  const { canUndo, canRedo, undo, redo, saveState, getCurrentState, historyLength, currentIndex } = useCanvasHistory()
+  const { canUndo, canRedo, undo, redo, saveState, getCurrentState, historyLength, currentIndex, initializeHistory } = useCanvasHistory()
+  
+  // Canvas state management
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<string | null>(null)
+
+  // Save current canvas state to project
+  const saveCurrentState = useCallback(() => {
+    if (projectId) {
+      setIsSaving(true)
+      ProjectCanvasUtils.saveCanvasState(projectId, nodes, edges)
+      setLastSaved(new Date().toISOString())
+      
+      setTimeout(() => setIsSaving(false), 1000) // Show saving indicator briefly
+      console.log('💾 Canvas state saved to project')
+    }
+  }, [projectId, nodes, edges])
+
+  // Check for unsaved changes
+  const hasUnsavedChanges = useCallback((): boolean => {
+    if (!projectId) return false
+    return ProjectCanvasUtils.hasUnsavedChanges(projectId, nodes, edges)
+  }, [projectId, nodes, edges])
   
   // Track if we're syncing from history to prevent conflicts
   const isSyncingFromHistory = useRef(false)
+
+  // Load saved state when project opens
+  useEffect(() => {
+    if (projectId) {
+      const savedState = ProjectCanvasUtils.loadCanvasState(projectId)
+      if (savedState) {
+        console.log('Loading saved canvas state for project:', projectId)
+        setNodes(savedState.nodes)
+        setEdges(savedState.edges)
+        // Initialize history with the loaded state as the initial state
+        initializeHistory(savedState.nodes, savedState.edges)
+        setLastSaved(new Date().toISOString())
+      }
+    }
+  }, [projectId, initializeHistory])
 
   // Sync state with history when undo/redo is performed
   useEffect(() => {
@@ -507,14 +548,31 @@ variable "environment" {
 `
         }
         
-        // Generate outputs.tf using the dedicated method
-        const generatedOutputsTf = await terraformGenerator.generateOutputsFile()
-        outputsTf = generatedOutputsTf.trim() ? generatedOutputsTf : `# Outputs for your infrastructure
+        // Generate outputs.tf
+        const terraformOutput = terraformGenerator.generate()
+        if (Object.keys(terraformOutput.outputs).length > 0) {
+          outputsTf = "# Outputs\n"
+          Object.entries(terraformOutput.outputs).forEach(([name, config]) => {
+            outputsTf += `output "${name}" {\n`
+            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
+              if (typeof value === "string") {
+                outputsTf += `  ${key} = "${value}"\n`
+              } else if (typeof value === "boolean") {
+                outputsTf += `  ${key} = ${value}\n`
+              } else {
+                outputsTf += `  ${key} = ${JSON.stringify(value)}\n`
+              }
+            })
+            outputsTf += "}\n\n"
+          })
+        } else {
+          outputsTf = `# Outputs for your infrastructure
 output "resources_created" {
   description = "Number of resources created"
   value       = ${nodes.length}
 }
 `
+        }
         
         // Generate providers.tf
         providersTf = terraformGenerator.generateProviderBlock()
@@ -752,10 +810,10 @@ provider "aws" {
   return (
     <div className="h-screen bg-white flex flex-col">
       {/* Top Header */}
-      <header className="h-12 border-b border-gray-200 bg-white flex items-center px-4">
+      <header className="h-14 border-b border-gray-200 bg-white flex items-center px-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={onBack} className="text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="w-4 h- mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
@@ -773,6 +831,21 @@ provider "aws" {
               showCounts={true}
               historyLength={historyLength}
               currentIndex={currentIndex}
+            />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={saveCurrentState}
+              disabled={!hasUnsavedChanges()}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+            <SaveStatusIndicator
+              isAutoSaving={isSaving}
+              hasUnsavedChanges={hasUnsavedChanges()}
+              lastSaved={lastSaved}
             />
             <Button 
               variant="ghost" 
@@ -936,6 +1009,7 @@ provider "aws" {
                 </GlassyPaneContainer>
               </div>
             </div>
+
           </div>
         </main>
 
