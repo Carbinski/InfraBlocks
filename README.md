@@ -1,8 +1,12 @@
-# InfraBlocks 🏗️
+<p align="center">
+  <img src="./logo/image.png" alt="InfraBlocks Logo" >
+</p>
 
-**Visual Infrastructure Designer with AI-Powered Assistant**
 
-InfraBlocks is a modern, drag-and-drop infrastructure design platform that lets you visually create, configure, and deploy cloud resources across AWS, GCP, and Azure. With built-in AI assistance, automated Terraform generation, and real-time deployment capabilities, it simplifies cloud infrastructure management for developers and DevOps teams.
+
+# InfraBlocks
+
+InfraBlocks is a modern drag-and-drop infrastructure design platform that lets you visually create, configure, and deploy cloud resources across AWS, GCP, and Azure. With an AI agent called Rex, automated Terraform generation, and real-time deployment capabilities, it simplifies cloud infrastructure management for everyone by removing technical barriers and making powerful tools accessible to all. Whether you’re a beginner exploring cloud services or an experienced developer seeking faster workflows, InfraBlocks provides an intuitive, visual way to build and launch infrastructure without needing deep certifications or complex configuration steps.
 
 ![InfraBlocks Demo](https://via.placeholder.com/800x400/0ea5e9/ffffff?text=InfraBlocks+Visual+Infrastructure+Designer)
 
