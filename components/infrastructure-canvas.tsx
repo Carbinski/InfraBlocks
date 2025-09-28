@@ -1212,10 +1212,7 @@ provider "aws" {
           <div className="bg-white rounded-lg shadow-lg border border-gray-200 w-[520px] h-[500px] flex flex-col">
             <div className="flex items-center justify-between p-3 border-b border-gray-200">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                  <Brain className="w-4 h-4 text-white" />
-                </div>
-                <span className="font-medium text-gray-900">AI Assistant</span>
+                <span className="font-medium text-gray-900">AI Assistant - Rex</span>
               </div>
               <Button
                 variant="ghost"

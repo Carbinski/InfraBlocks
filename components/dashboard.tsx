@@ -24,6 +24,7 @@ import { CredentialManager, type AWSCredentials, type AzureCredentials, type GCP
 import { testCredentials } from "@/lib/api-service"
 // Remove the separate persistence import - we'll use localStorage directly
 import { cn } from "@/lib/utils"
+import Image from "next/image"
 import {
   Brain,
   Copy,
@@ -280,10 +281,16 @@ export function Dashboard() {
         {/* Logo */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-              <Brain className="w-4 h-4 text-white" />
+            <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center overflow-hidden">
+              <Image
+                src="/aws/icon.png"
+                alt="InfraBlocks Logo"
+                width={48}
+                height={48}
+                className="object-cover"
+              />
             </div>
-            <span className="font-semibold text-lg text-gray-900">Infrablocks</span>
+            <span className="font-semibold text-xl text-gray-900">InfraBlocks Rex</span>
           </div>
         </div>
 

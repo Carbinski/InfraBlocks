@@ -244,8 +244,6 @@ export class TerraformGenerator {
           ami: config.ami || "ami-0abcdef1234567890",
           instance_type: config.instance_type || "t3.micro",
           key_name: config.key_name || null,
-          vpc_security_group_ids: this.getSecurityGroupReferences(node.id),
-          subnet_id: this.getSubnetReference(node.id),
           tags: {
             Name: config.name || `${node.data.name}-instance`,
             Environment: "terraform-generated",
@@ -265,7 +263,7 @@ export class TerraformGenerator {
 
       case "dynamodb":
         return {
-          name: config.table_name || `${this.sanitizeName(node.data.name as string)}-table`,
+          name: config.table_name || `${this.sanitizeName(node.data.name as string)}-table-${Date.now()}`,
           billing_mode: config.billing_mode || "PAY_PER_REQUEST",
           hash_key: config.hash_key || "id",
           ...(config.range_key && { range_key: config.range_key }),
@@ -299,16 +297,14 @@ export class TerraformGenerator {
 
       case "rds":
         return {
-          identifier: config.db_name || `${this.sanitizeName(node.data.name as string)}-db`,
+          identifier: config.db_name || `${this.sanitizeName(node.data.name as string)}-db-${Date.now()}`,
           engine: config.engine || "mysql",
           engine_version: this.getEngineVersion(config.engine || "mysql"),
           instance_class: config.instance_class || "db.t3.micro",
           allocated_storage: Number.parseInt(config.allocated_storage) || 20,
-          db_name: config.db_name || "mydb",
+          db_name: config.db_name || `mydb_${Date.now()}`,
           username: "admin",
-          password: "var.db_password",
-          vpc_security_group_ids: this.getSecurityGroupReferences(node.id),
-          db_subnet_group_name: this.getDBSubnetGroupReference(node.id),
+          password: config.password || "password123",
           skip_final_snapshot: true,
           tags: {
             Name: config.name || node.data.name,
@@ -522,15 +518,7 @@ export class TerraformGenerator {
       default: this.getDefaultRegion(),
     }
 
-    // Only add db_password if there are RDS nodes
-    const hasRDS = this.nodes.some(node => node.data.id === 'rds')
-    if (this.provider === "aws" && hasRDS) {
-      variables.db_password = {
-        description: "Database password",
-        type: "string",
-        sensitive: true,
-      }
-    }
+    // Note: RDS password is now set to default "password123" instead of using variables
 
     // Add Lambda S3 variables if there are Lambda nodes
     const hasLambda = this.nodes.some(node => node.data.id === 'lambda')

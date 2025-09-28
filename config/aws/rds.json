@@ -10,7 +10,8 @@
     "instance_class": "db.t3.micro",
     "allocated_storage": 20,
     "db_name": "mydb",
-    "username": "admin"
+    "username": "admin",
+    "password": "password123"
   },
   "configSchema": {
     "engine": {
@@ -57,7 +58,8 @@
       "type": "string",
       "label": "Master Password",
       "description": "The master password for the database",
-      "required": true
+      "default": "password123",
+      "required": false
     },
     "backup_retention_period": {
       "type": "number",
