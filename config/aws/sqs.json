@@ -7,70 +7,105 @@
   "terraformType": "aws_sqs_queue",
   "defaultConfig": {
     "name": "my-queue",
+    "fifo_queue": false,
+    "content_based_deduplication": false,
     "delay_seconds": 0,
     "max_message_size": 262144,
-    "message_retention_period": 345600,
-    "receive_message_wait_time_seconds": 0,
-    "visibility_timeout_seconds": 30
+    "message_retention_seconds": 345600,
+    "receive_wait_time_seconds": 0,
+    "visibility_timeout_seconds": 30,
+    "dead_letter_queue": false,
+    "max_receive_count": 3,
+    "kms_master_key_id": "",
+    "kms_data_key_reuse_period_seconds": 300
   },
   "configSchema": {
     "name": {
       "type": "string",
       "label": "Queue Name",
       "description": "The name of the SQS queue",
-      "required": true
+      "required": true,
+      "validation": { "pattern": "^[a-zA-Z0-9_-]*$" }
+    },
+    "visibility_timeout_seconds": {
+      "type": "number",
+      "label": "Visibility Timeout (seconds)",
+      "description": "Time a message stays hidden after being received",
+      "default": 30,
+      "required": true,
+      "validation": { "min": 0, "max": 43200 }
+    },
+    "message_retention_seconds": {
+      "type": "number",
+      "label": "Message Retention (seconds)",
+      "description": "Retention period (max 14 days = 1209600 seconds)",
+      "default": 345600,
+      "required": true,
+      "validation": { "min": 60, "max": 1209600 }
     },
     "delay_seconds": {
       "type": "number",
       "label": "Delay Seconds",
-      "description": "The time in seconds that the delivery of all messages in the queue will be delayed",
+      "description": "Delay delivery of all messages",
       "default": 0,
-      "min": 0,
-      "max": 900
+      "required": true,
+      "validation": { "min": 0, "max": 900 }
+    },
+    "receive_wait_time_seconds": {
+      "type": "number",
+      "label": "Receive Wait Time (seconds)",
+      "description": "Long polling wait time",
+      "default": 0,
+      "required": false,
+      "validation": { "min": 0, "max": 20 }
     },
     "max_message_size": {
       "type": "number",
-      "label": "Max Message Size",
-      "description": "The limit of how many bytes a message can contain before Amazon SQS rejects it",
+      "label": "Max Message Size (bytes)",
+      "description": "Reject messages larger than this size",
       "default": 262144,
-      "min": 1024,
-      "max": 262144
-    },
-    "message_retention_period": {
-      "type": "number",
-      "label": "Message Retention Period",
-      "description": "The length of time, in seconds, for which Amazon SQS retains a message",
-      "default": 345600,
-      "min": 60,
-      "max": 1209600
-    },
-    "receive_message_wait_time_seconds": {
-      "type": "number",
-      "label": "Receive Message Wait Time",
-      "description": "The time for which a ReceiveMessage call will wait for a message to arrive",
-      "default": 0,
-      "min": 0,
-      "max": 20
-    },
-    "visibility_timeout_seconds": {
-      "type": "number",
-      "label": "Visibility Timeout",
-      "description": "The visibility timeout for the queue",
-      "default": 30,
-      "min": 0,
-      "max": 43200
+      "required": false,
+      "validation": { "min": 1024, "max": 262144 }
     },
     "fifo_queue": {
       "type": "boolean",
       "label": "FIFO Queue",
-      "description": "Whether this is a FIFO queue",
+      "description": "Enable First-In-First-Out behavior (requires .fifo name suffix)",
       "default": false
     },
-    "tags": {
+    "content_based_deduplication": {
+      "type": "boolean",
+      "label": "Content-Based Deduplication",
+      "description": "For FIFO queues: dedupe by message body hash",
+      "default": false
+    },
+    "dead_letter_queue": {
+      "type": "boolean",
+      "label": "Enable Dead Letter Queue",
+      "description": "Configure a DLQ via redrive policy",
+      "default": false
+    },
+    "max_receive_count": {
+      "type": "number",
+      "label": "Max Receive Count",
+      "description": "Times a message can be received before moving to DLQ",
+      "default": 3,
+      "required": false,
+      "validation": { "min": 1, "max": 1000 }
+    },
+    "kms_master_key_id": {
       "type": "string",
-      "label": "Tags",
-      "description": "JSON string of tags to apply",
+      "label": "KMS Master Key ID",
+      "description": "CMK ID or alias for SSE",
       "required": false
+    },
+    "kms_data_key_reuse_period_seconds": {
+      "type": "number",
+      "label": "KMS Data Key Reuse (seconds)",
+      "description": "Reuse period for data keys",
+      "default": 300,
+      "required": false,
+      "validation": { "min": 60, "max": 86400 }
     }
   }
 }

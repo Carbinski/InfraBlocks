@@ -1,9 +1,11 @@
 "use client"
 
+import { useState } from "react"
+import { ReactFlowProvider } from "@xyflow/react"
 
 import { InfrastructureCanvas } from "@/components/infrastructure-canvas"
 import { ProviderSelection } from "@/components/provider-selection"
-import { ReactFlowProvider } from "@xyflow/react"
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,14 +18,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreHorizontal, RefreshCw, Settings, Share, Trash2 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { ArrowLeft } from "lucide-react"
 
 interface Project {
   id: string
@@ -44,63 +39,56 @@ interface ProjectViewProps {
 }
 
 // Simple wrapper - canvas now handles AI infrastructure directly
-function InfrastructureCanvasWrapper({ provider, onBack }: { provider: "aws" | "gcp" | "azure", onBack: () => void }) {
-  console.log('🎨 InfrastructureCanvasWrapper: Rendering canvas with provider:', provider)
-
-  return (
-    <InfrastructureCanvas
-      provider={provider}
-      onBack={onBack}
-    />
-  )
+function InfrastructureCanvasWrapper({
+  provider,
+  onBack,
+}: {
+  provider: "aws" | "gcp" | "azure"
+  onBack: () => void
+}) {
+  // Dev log is fine in client comps
+  console.log("🎨 InfrastructureCanvasWrapper: Rendering canvas with provider:", provider)
+  return <InfrastructureCanvas provider={provider} onBack={onBack} />
 }
 
 export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject }: ProjectViewProps) {
   const [selectedProvider, setSelectedProvider] = useState<"aws" | "gcp" | "azure" | null>(project.provider || null)
-  const [showCanvas, setShowCanvas] = useState(false)
+  const [showCanvas, setShowCanvas] = useState(!!project.provider)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const handleProviderSelect = (provider: "aws" | "gcp" | "azure") => {
     setSelectedProvider(provider)
-
-    const updatedProject = {
+    onUpdateProject({
       ...project,
       provider,
       lastModified: "Just now",
-    }
-    onUpdateProject(updatedProject)
-    
+    })
     setShowCanvas(true)
   }
 
   const handleProviderChange = () => {
     setSelectedProvider(null)
     setShowCanvas(false)
-
-    const updatedProject = {
+    onUpdateProject({
       ...project,
       provider: undefined,
       lastModified: "Just now",
-    }
-    onUpdateProject(updatedProject)
+    })
   }
 
   const handleBackToProviderSelection = () => {
     setShowCanvas(false)
     setSelectedProvider(null)
-    
-    // Update project to remove provider
-    const updatedProject = {
+    onUpdateProject({
       ...project,
       provider: undefined,
       lastModified: "Just now",
-    }
-    onUpdateProject(updatedProject)
+    })
   }
 
   const handleDeleteProject = () => {
     onDeleteProject(project.id)
-    onBack() 
+    onBack()
   }
 
   return (
@@ -117,7 +105,9 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
               <div className="h-4 w-px bg-border" />
               <div>
                 <h1 className="text-lg font-semibold text-foreground">{project.name}</h1>
-                {project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}
+                {project.description && (
+                  <p className="text-sm text-muted-foreground">{project.description}</p>
+                )}
               </div>
               {selectedProvider && (
                 <Badge variant="secondary" className="ml-2 bg-accent text-accent-foreground">
@@ -133,17 +123,27 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
               <div className="max-w-4xl mx-auto">
                 <ProviderSelection onProviderSelect={handleProviderSelect} />
               </div>
-            ) : null}
+            ) : (
+              <div className="max-w-4xl mx-auto text-center py-8">
+                <p className="text-muted-foreground">Loading infrastructure canvas...</p>
+                <Button variant="ghost" size="sm" className="mt-4" onClick={handleProviderChange}>
+                  Change provider
+                </Button>
+              </div>
+            )}
           </main>
         </div>
       ) : (
         <>
-          {console.log('🎨 ProjectView: Rendering canvas with provider:', selectedProvider)}
+          {console.log("🎨 ProjectView: Rendering canvas with provider:", selectedProvider)}
           <ReactFlowProvider>
-            <InfrastructureCanvasWrapper
-              provider={selectedProvider!}
-              onBack={handleBackToProviderSelection}
-            />
+            {/* Guard against null just in case */}
+            {selectedProvider && (
+              <InfrastructureCanvasWrapper
+                provider={selectedProvider}
+                onBack={handleBackToProviderSelection}
+              />
+            )}
           </ReactFlowProvider>
         </>
       )}
