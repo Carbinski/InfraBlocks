@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn, useCedarStore } from '@/lib/utils';
 
 // import { CedarEditorContent as EditorContent } from '@/lib/utils'; // Removed cedar-os dependency
 import { Code, Image, Mic, SendHorizonal } from 'lucide-react';
@@ -33,7 +33,7 @@ export const ChatInput: React.FC<{
 }) => {
 	const [isFocused, setIsFocused] = React.useState(false);
 
-	const { editor, isEditorEmpty, handleSubmit } = useCedarEditor({
+	const { editor, isEditorEmpty, handleSubmit: originalHandleSubmit } = useCedarEditor({
 		onFocus: () => {
 			setIsFocused(true);
 			handleFocus?.();
@@ -44,6 +44,29 @@ export const ChatInput: React.FC<{
 		},
 		stream,
 	});
+
+	// Custom submit handler that uses our agent
+	const handleSubmit = useCallback(() => {
+		if (editor && !isEditorEmpty) {
+			const content = editor.getText();
+			if (content.trim()) {
+				const message = {
+					id: `msg_${Date.now()}`,
+					type: 'text' as const,
+					role: 'user' as const,
+					content: content.trim(),
+					timestamp: Date.now()
+				};
+
+				// Use our store's processUserMessage instead of the original
+				const store = useCedarStore.getState();
+				store.processUserMessage(message);
+
+				// Clear the editor
+				editor.commands.clearContent();
+			}
+		}
+	}, [editor, isEditorEmpty]);
 
 	// Initialize voice functionality
 	// const voice = useVoice(); // Removed cedar-os dependency

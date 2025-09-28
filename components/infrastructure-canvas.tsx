@@ -47,6 +47,8 @@ import { DeploymentStatusPanel } from "./deployment-status-panel"
 import { TerraformGenerator } from "./terraform-generator"
 import { UndoRedoControls } from "./undo-redo-controls"
 import { useCanvasHistory } from "@/hooks/use-canvas-history"
+import { registerCanvasFunctions, unregisterCanvasFunctions } from "@/lib/infrastructure-manager"
+import { AgentChat } from "@/components/agent-chat"
 
 import { AIReviewDialog } from "./ai-review-dialog"
 
@@ -98,6 +100,44 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     }
   }, [currentIndex]) // Only depend on currentIndex, not the function
 
+  // Canvas add functions for AI infrastructure creation
+  const addNodesToCanvas = useCallback((newNodes: Node[]) => {
+    console.log('🎯 Canvas: AI adding nodes directly to canvas:', newNodes.length)
+
+    setNodes((currentNodes) => {
+      console.log('📊 Canvas: Current nodes:', currentNodes.length, 'Adding:', newNodes.length)
+      const updatedNodes = [...currentNodes, ...newNodes]
+      console.log('📊 Canvas: New total nodes:', updatedNodes.length)
+      return updatedNodes
+    })
+  }, [])
+
+  const addEdgesToCanvas = useCallback((newEdges: Edge[]) => {
+    console.log('🔗 Canvas: AI adding edges directly to canvas:', newEdges.length)
+    setEdges((currentEdges) => {
+      console.log('📊 Canvas: Current edges:', currentEdges.length, 'Adding:', newEdges.length)
+      const updatedEdges = [...currentEdges, ...newEdges]
+      console.log('📊 Canvas: New total edges:', updatedEdges.length)
+      return updatedEdges
+    })
+  }, [])
+
+  // Get canvas state function
+  const getCanvasState = useCallback(() => {
+    return { nodes, edges }
+  }, [nodes, edges])
+
+  // Register canvas functions for AI infrastructure creation
+  useEffect(() => {
+    console.log('🎨 Infrastructure Canvas: Registering functions for AI')
+    registerCanvasFunctions(addNodesToCanvas, addEdgesToCanvas, getCanvasState)
+
+    return () => {
+      console.log('🎨 Infrastructure Canvas: Unregistering functions')
+      unregisterCanvasFunctions()
+    }
+  }, [addNodesToCanvas, addEdgesToCanvas, getCanvasState])
+
   // Debug: Log edges changes
   useEffect(() => {
     console.log('Edges updated:', edges)
@@ -132,6 +172,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [deploymentError, setDeploymentError] = useState<string | null>(null)
   const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
   const [isAIReviewOpen, setIsAIReviewOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
   const [isAIReviewLoading, setIsAIReviewLoading] = useState(false)
   const [aiReviewError, setAiReviewError] = useState<string | null>(null)
@@ -1065,6 +1106,40 @@ provider "aws" {
         isLoading={isAIReviewLoading}
         error={aiReviewError}
       />
+
+      {/* Floating Chat Widget */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {isChatOpen ? (
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 w-[520px] h-[500px] flex flex-col">
+            <div className="flex items-center justify-between p-3 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                  <Brain className="w-4 h-4 text-white" />
+                </div>
+                <span className="font-medium text-gray-900">AI Assistant</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsChatOpen(false)}
+                className="h-6 w-6 p-0 hover:bg-gray-100"
+              >
+                <span className="text-gray-500 text-lg leading-none">×</span>
+              </Button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <AgentChat />
+            </div>
+          </div>
+        ) : (
+          <Button
+            onClick={() => setIsChatOpen(true)}
+            className="w-14 h-14 rounded-full bg-orange-500 hover:bg-orange-600 shadow-lg flex items-center justify-center"
+          >
+            <Brain className="w-6 h-6 text-white" />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
