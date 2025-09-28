@@ -63,6 +63,7 @@ export async function addInfrastructureToCanvas(components: InfrastructureCompon
       // Load the full service configuration data
       let serviceConfig = await ConfigLoader.loadServiceConfig(component.provider, component.service)
 
+
       // Fallback if config not found
       if (!serviceConfig) {
         console.warn(`⚠️ Infrastructure Manager: No config found for ${component.provider}/${component.service}, using fallback`)
@@ -89,7 +90,7 @@ export async function addInfrastructureToCanvas(components: InfrastructureCompon
           service: component.service,
           provider: component.provider,
           config: component.config || {},
-          terraformType: component.service,
+          // Keep the terraformType from serviceConfig, don't override it
         },
       }
     }))

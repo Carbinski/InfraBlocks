@@ -437,11 +437,11 @@ async function generateAdditionalFiles(
  * Generate AWS security groups
  */
 function generateAWSSecurityGroups(nodes: Node[]): string {
-  const hasEC2 = nodes.some(node => node.data.id === 'ec2')
-  const hasExistingVPC = nodes.some(node => node.data.id === 'vpc')
+  const hasSecurityGroup = nodes.some(node => node.data.id === 'security_group')
+  const hasVPC = nodes.some(node => node.data.id === 'vpc')
 
-  // Generate security groups when we have EC2 instances that need network access
-  if (!hasEC2) return ''
+  // Only generate security groups when there's an explicit security group or VPC node
+  if (!hasSecurityGroup && !hasVPC) return ''
 
   return `# Security Groups
 resource "aws_security_group" "default" {
@@ -487,9 +487,9 @@ resource "aws_security_group" "default" {
  * Generate AWS VPC configuration
  */
 function generateAWSVPCConfig(nodes: Node[]): string {
-  const hasEC2 = nodes.some(node => node.data.id === 'ec2')
-  // Generate VPC config when we have EC2 instances that need network infrastructure
-  if (!hasEC2) return ''
+  const hasVPC = nodes.some(node => node.data.id === 'vpc')
+  // Only generate VPC config when there's an explicit VPC node in the diagram
+  if (!hasVPC) return ''
 
   return `# VPC Configuration
 resource "aws_vpc" "main" {

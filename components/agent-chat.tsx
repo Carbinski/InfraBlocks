@@ -188,7 +188,7 @@ export function AgentChat() {
       const welcomeMessage: Message = {
         id: 'welcome',
         role: 'assistant',
-        content: "Hello! I'm your AI infrastructure assistant. How can I help you today?",
+        content: "Hello! I'm Rex, your infrastructure assistant. How can I help you today?",
         timestamp: Date.now(),
         type: 'dialogue_options',
         options: [
