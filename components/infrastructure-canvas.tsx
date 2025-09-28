@@ -320,38 +320,6 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     setSelectedEdges(selectedEdgesArray.map(edge => edge.id))
   }, [])
 
-  // Test function to manually create a connection
-  const testConnection = () => {
-    if (nodes.length >= 2) {
-      const testEdge = {
-        id: `test-${Date.now()}`,
-        source: nodes[0].id,
-        target: nodes[1].id,
-        type: 'smoothstep',
-        animated: false,
-        style: { stroke: '#ff0000', strokeWidth: 5 },
-        data: {
-          relationship: "test_connection",
-          description: "Test connection",
-          bidirectional: false,
-        },
-      }
-      console.log('Creating test connection:', testEdge)
-      console.log('Current nodes:', nodes)
-      console.log('Current edges before:', edges)
-      
-      // Calculate the new state before applying it
-      const updatedEdges = addEdge(testEdge, edges)
-      
-      // Save state with the complete new state
-      if (!isSyncingFromHistory.current) {
-        saveState(nodes, updatedEdges, 'test_connect')
-      }
-      
-      setEdges(updatedEdges)
-    }
-  }
-
 
   const suggestions = getConnectionSuggestions(nodes, provider!)
 
@@ -831,7 +799,7 @@ provider "aws" {
               </div>
             </div>
 
-            {/* Node Count and Test Button */}
+            {/* Node and edge summary */}
             <div className="mt-auto pt-4 border-t border-gray-200">
               <div className="text-xs text-gray-500 mb-2">
                 Number of nodes: {nodes.length}
@@ -853,16 +821,6 @@ provider "aws" {
                     Delete Selected
                   </Button>
                 </div>
-              )}
-              {nodes.length >= 2 && (
-                <Button 
-                  onClick={testConnection}
-                  size="sm"
-                  variant="outline"
-                  className="w-full text-xs"
-                >
-                  Test Connection
-                </Button>
               )}
             </div>
           </div>
@@ -1068,4 +1026,3 @@ provider "aws" {
     </div>
   )
 }
-
