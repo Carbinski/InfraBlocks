@@ -851,6 +851,9 @@ provider "aws" {
                   className="bg-gray-50"
                   connectionLineStyle={{ stroke: "#666", strokeWidth: 2 }}
                   defaultEdgeOptions={defaultEdgeOptions}
+                  // Increase the connection radius so users don't have to be pixel-perfect when
+                  // starting/ending connections on small handles.
+                  connectionRadius={40}
                   snapToGrid={true}
                   snapGrid={[20, 20]}
                   panOnDrag={true}

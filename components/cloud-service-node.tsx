@@ -100,69 +100,34 @@ export const CloudServiceNode = memo(({ data, selected, onDoubleClick }: CloudSe
   return (
     <div className={`relative ${selected ? "ring-2 ring-blue-500 ring-offset-2" : ""}`}>
       {/* Handles on all four sides: top, bottom, left, right */}
-      {/* Left side handles */}
-      <Handle
-        type="source"
-        position={Position.Left}
-        id="left-source"
-        className="w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-        style={{ opacity: 1 }}
-      />
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="left-target"
-        className="w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-        style={{ opacity: 1 }}
-      />
-      
-      {/* Right side handles */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="right-source"
-        className="w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-        style={{ opacity: 1 }}
-      />
-      <Handle
-        type="target"
-        position={Position.Right}
-        id="right-target"
-        className="w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-        style={{ opacity: 1 }}
-      />
-      
-      {/* Top side handles */}
-      <Handle
-        type="source"
-        position={Position.Top}
-        id="top-source"
-        className="w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-        style={{ opacity: 1 }}
-      />
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="top-target"
-        className="w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-        style={{ opacity: 1 }}
-      />
-      
-      {/* Bottom side handles */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        id="bottom-source"
-        className="w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-        style={{ opacity: 1 }}
-      />
-      <Handle
-        type="target"
-        position={Position.Bottom}
-        id="bottom-target"
-        className="w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:bg-blue-700 transition-colors"
-        style={{ opacity: 1 }}
-      />
+      {/* Use a shared class to ensure transforms originate from center, use GPU acceleration,
+          and raise z-index while hovered so the scaled circle doesn't reveal artifacts. */}
+      {/* `pointer-events-auto` ensures the handle receives hover events even if its parent scales. */}
+      {(() => {
+        const handleClass =
+          "w-3.5 h-3.5 !bg-blue-400 dark:!bg-blue-500 hover:!bg-blue-600 dark:hover:!bg-blue-700 " +
+          "transform-gpu origin-center transition-transform duration-150 transition-colors hover:scale-125 hover:z-20 pointer-events-auto rounded-full";
+
+        return (
+          <>
+            {/* Left side handles */}
+            <Handle type="source" position={Position.Left} id="left-source" className={handleClass} style={{ opacity: 1, transformOrigin: 'center' }} />
+            <Handle type="target" position={Position.Left} id="left-target" className={handleClass} style={{ opacity: 1, transformOrigin: 'center' }} />
+
+            {/* Right side handles */}
+            <Handle type="source" position={Position.Right} id="right-source" className={handleClass} style={{ opacity: 1, transformOrigin: 'center' }} />
+            <Handle type="target" position={Position.Right} id="right-target" className={handleClass} style={{ opacity: 1, transformOrigin: 'center' }} />
+
+            {/* Top side handles */}
+            <Handle type="source" position={Position.Top} id="top-source" className={handleClass} style={{ opacity: 1, transformOrigin: 'center' }} />
+            <Handle type="target" position={Position.Top} id="top-target" className={handleClass} style={{ opacity: 1, transformOrigin: 'center' }} />
+
+            {/* Bottom side handles */}
+            <Handle type="source" position={Position.Bottom} id="bottom-source" className={handleClass} style={{ opacity: 1, transformOrigin: 'center' }} />
+            <Handle type="target" position={Position.Bottom} id="bottom-target" className={handleClass} style={{ opacity: 1, transformOrigin: 'center' }} />
+          </>
+        )
+      })()}
 
       <div 
         className="cursor-pointer hover:scale-105 transition-transform duration-200"
