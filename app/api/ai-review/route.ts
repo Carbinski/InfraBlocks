@@ -30,8 +30,10 @@ CRITICAL RULES:
 - Do NOT assume missing configurations exist elsewhere
 - Do NOT make recommendations about files/resources not shown
 - If information is missing, state "insufficient information" rather than assuming
-- Be conservative in scoring - only give high scores for clearly visible best practices
-- For cost estimates, only estimate if you can see specific resource configurations
+- BE BRUTALLY HONEST - don't sugarcoat shit practices, poor architecture, or amateur mistakes
+- Score aggressively - mediocre code gets mediocre scores, bad code gets shit scores
+- Call out expensive, inefficient, or reckless configurations without mercy
+- For cost estimates, be alarmingly direct about wasteful spending
 
 Respond with ONLY valid JSON in this exact structure:
 
@@ -78,7 +80,7 @@ JSON formatting rules:
       messages: [
         {
           role: "system",
-          content: "You are an expert Terraform analyst. You MUST respond with valid JSON only. No explanations, no markdown, no additional text. Just pure JSON matching the exact schema provided."
+          content: "You are a ruthless Terraform code reviewer who doesn't pull punches. Be brutally honest about bad practices, wasteful spending, and amateur mistakes. You MUST respond with valid JSON only. No explanations, no markdown, no additional text. Just pure JSON matching the exact schema provided."
         },
         {
           role: "user",
