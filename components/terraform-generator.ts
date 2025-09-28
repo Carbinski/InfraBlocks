@@ -174,6 +174,45 @@ export class TerraformGenerator {
           }
         }
       }
+
+      if (node.data.id === 'sqs') {
+        const config = node.data.config as any
+        const resourceName = this.sanitizeName((node.data.name as string) || (node.data.id as string))
+        
+        // Add Dead Letter Queue if enabled
+        if (config.dead_letter_queue && config.max_receive_count) {
+          const dlqName = `${resourceName}-dlq`
+          
+          // Create the DLQ first
+          resources.push({
+            type: 'aws_sqs_queue',
+            name: `${resourceName}_dlq`,
+            config: {
+              name: dlqName,
+              visibility_timeout_seconds: 30,
+              message_retention_seconds: 1209600,
+              delay_seconds: 0,
+              tags: {
+                Name: `${node.data.name as string}-dlq`,
+                Environment: "terraform-generated",
+                Type: "DeadLetterQueue"
+              },
+            },
+            dependencies: [],
+          })
+
+          // Update the main queue to reference the DLQ
+          const mainQueueResource = resources.find(r => r.type === 'aws_sqs_queue' && r.name === resourceName)
+          if (mainQueueResource) {
+            mainQueueResource.config.redrive_policy = `jsonencode({
+  "deadLetterTargetArn": aws_sqs_queue.${resourceName}_dlq.arn,
+  "maxReceiveCount": ${config.max_receive_count}
+})`
+            mainQueueResource.dependencies = mainQueueResource.dependencies || []
+            mainQueueResource.dependencies.push(`aws_sqs_queue.${resourceName}_dlq`)
+          }
+        }
+      }
     })
     
     return resources
@@ -323,6 +362,37 @@ export class TerraformGenerator {
             Environment: "terraform-generated",
           },
         }
+
+      case "sqs":
+        const sqsConfig: Record<string, any> = {
+          name: config.name || `${this.sanitizeName(node.data.name as string)}-queue`,
+          visibility_timeout_seconds: config.visibility_timeout_seconds || 30,
+          message_retention_seconds: config.message_retention_seconds || 1209600,
+          delay_seconds: config.delay_seconds || 0,
+          tags: {
+            Name: config.name || node.data.name,
+            Environment: "terraform-generated",
+          },
+        }
+
+        // Add FIFO queue configuration if enabled
+        if (config.fifo_queue) {
+          sqsConfig.name = `${sqsConfig.name}.fifo`
+          sqsConfig.fifo_queue = true
+          if (config.content_based_deduplication) {
+            sqsConfig.content_based_deduplication = true
+          }
+        }
+
+        // Add KMS encryption if configured
+        if (config.kms_master_key_id) {
+          sqsConfig.kms_master_key_id = config.kms_master_key_id
+          if (config.kms_data_key_reuse_period_seconds) {
+            sqsConfig.kms_data_key_reuse_period_seconds = config.kms_data_key_reuse_period_seconds
+          }
+        }
+
+        return sqsConfig
 
       default:
         return resourceConfig

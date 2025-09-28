@@ -1,0 +1,105 @@
+{
+  "id": "sqs",
+  "name": "SQS",
+  "icon": "/aws/Simple Queue Service.svg",
+  "category": "Messaging",
+  "description": "Simple Queue Service for message queuing",
+  "terraformType": "aws_sqs_queue",
+  "defaultConfig": {
+    "name": "",
+    "visibility_timeout_seconds": 30,
+    "message_retention_seconds": 1209600,
+    "delay_seconds": 0,
+    "max_receive_count": 3
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "Queue Name",
+      "description": "The name of the SQS queue",
+      "required": true,
+      "validation": {
+        "pattern": "^[a-zA-Z0-9_-]*$"
+      }
+    },
+    "visibility_timeout_seconds": {
+      "type": "number",
+      "label": "Visibility Timeout (seconds)",
+      "description": "The length of time a message is hidden from other consumers",
+      "default": 30,
+      "required": true,
+      "validation": {
+        "min": 0,
+        "max": 43200
+      }
+    },
+    "message_retention_seconds": {
+      "type": "number",
+      "label": "Message Retention (seconds)",
+      "description": "The number of seconds to retain messages in the queue (max 14 days = 1209600 seconds)",
+      "default": 1209600,
+      "required": true,
+      "validation": {
+        "min": 60,
+        "max": 1209600
+      }
+    },
+    "delay_seconds": {
+      "type": "number",
+      "label": "Delay Seconds",
+      "description": "The number of seconds to delay the delivery of messages",
+      "default": 0,
+      "required": true,
+      "validation": {
+        "min": 0,
+        "max": 900
+      }
+    },
+    "max_receive_count": {
+      "type": "number",
+      "label": "Max Receive Count",
+      "description": "Maximum number of times a message can be received (for DLQ configuration)",
+      "default": 3,
+      "required": false,
+      "validation": {
+        "min": 1,
+        "max": 1000
+      }
+    },
+    "fifo_queue": {
+      "type": "boolean",
+      "label": "FIFO Queue",
+      "description": "Enable FIFO (First-In-First-Out) queue",
+      "default": false
+    },
+    "content_based_deduplication": {
+      "type": "boolean",
+      "label": "Content-Based Deduplication",
+      "description": "Enable content-based deduplication for FIFO queues",
+      "default": false
+    },
+    "dead_letter_queue": {
+      "type": "boolean",
+      "label": "Enable Dead Letter Queue",
+      "description": "Configure a dead letter queue for failed messages",
+      "default": false
+    },
+    "kms_master_key_id": {
+      "type": "string",
+      "label": "KMS Master Key ID",
+      "description": "The ID of an AWS-managed customer master key (CMK) for Amazon SQS",
+      "required": false
+    },
+    "kms_data_key_reuse_period_seconds": {
+      "type": "number",
+      "label": "KMS Data Key Reuse Period (seconds)",
+      "description": "The length of time for which Amazon SQS can reuse a data key to encrypt or decrypt messages",
+      "default": 300,
+      "required": false,
+      "validation": {
+        "min": 60,
+        "max": 86400
+      }
+    }
+  }
+}
