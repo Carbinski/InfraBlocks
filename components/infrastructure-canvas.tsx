@@ -97,6 +97,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     "outputs.tf": "",
     "providers.tf": ""
   })
+
   const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus | null>(null)
   const [isDeploying, setIsDeploying] = useState(false)
   const [deploymentError, setDeploymentError] = useState<string | null>(null)
@@ -196,7 +197,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     (event: DragEvent) => {
       event.preventDefault()
 
-      if (!reactFlowWrapper.current || !reactFlowInstance) return
+      if (!reactFlowInstance) return
 
       const serviceData = event.dataTransfer.getData("application/reactflow")
 
@@ -204,14 +205,11 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
 
       const service = JSON.parse(serviceData)
       
-      // Get the mouse position relative to the ReactFlow wrapper
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect()
-      const mouseX = event.clientX - reactFlowBounds.left
-      const mouseY = event.clientY - reactFlowBounds.top
-      
+      // Use the ReactFlow instance's screenToFlowPosition method directly
+      // This method handles all the internal transforms, zoom, and pan calculations
       const position = reactFlowInstance.screenToFlowPosition({
-        x: mouseX,
-        y: mouseY,
+        x: event.clientX,
+        y: event.clientY,
       })
 
       const newNode: Node = {
@@ -753,7 +751,7 @@ provider "aws" {
 
           {/* Canvas Area */}
           <div className="flex-1 relative bg-gray-50">
-            <div ref={reactFlowWrapper} className="h-full">
+            <div className="h-full">
               <ReactFlowProvider>
                 <ReactFlow
                   nodes={nodes}
