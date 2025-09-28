@@ -25,7 +25,7 @@ export const CloudServiceNode = memo(({ data, selected, onDoubleClick }: CloudSe
     )
   }
 
-  // Type assertion for the node data
+  
   const nodeData = data as CloudServiceNodeData
 
   // Load service configuration when component mounts

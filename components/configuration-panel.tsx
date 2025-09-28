@@ -16,14 +16,15 @@ export function ConfigurationPanel({
   onClose, 
   nodeData, 
   serviceConfig, 
-  onConfigUpdate 
+  onConfigUpdate,
+  onSave 
 }: ConfigurationPanelProps) {
   const [config, setConfig] = useState<Record<string, any>>(nodeData?.config || {})
   const [searchTerm, setSearchTerm] = useState("")
   const [loadedServiceConfig, setLoadedServiceConfig] = useState<ServiceConfig | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Load service configuration when component mounts
+  
   useEffect(() => {
     const loadConfig = async () => {
       if (!nodeData?.provider || !nodeData?.id) return
@@ -198,7 +199,7 @@ export function ConfigurationPanel({
       'x-ray': '/aws/Arch_AWS-X-Ray_64.svg'
     }
 
-    return iconMap[serviceId] || '/aws/Arch_Amazon-EC2_64.svg' // fallback to EC2 icon
+    return iconMap[serviceId] || '/aws/Arch_Amazon-EC2_64.svg'
   }
 
   const getNodeColor = (serviceId: string, provider: string) => {
@@ -224,7 +225,13 @@ export function ConfigurationPanel({
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900">
               <Undo className="w-3 h-3" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+              onClick={onSave}
+              disabled={!onSave}
+            >
               <Save className="w-3 h-3" />
             </Button>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900">

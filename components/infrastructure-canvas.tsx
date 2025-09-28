@@ -8,7 +8,11 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select"
+import { deployInfrastructure, getDeploymentStatus } from "@/lib/api-service"
+import { ConfigLoader } from "@/lib/config-loader"
+import { CredentialManager } from "@/lib/credential-manager"
 import { InfrastructureCanvasProps } from "@/types"
+import type { DeploymentStatus } from "@/types/deployment"
 import {
   addEdge,
   Background,
@@ -29,14 +33,15 @@ import {
   ArrowLeft,
   Code,
   Download,
-  Pin,
+  History,
   Play
 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { CloudServiceNode } from "./cloud-service-node"
 import { ConfigurationPanel } from "./configuration-panel"
 import { getConnectionSuggestions, validateConnection } from "./connection-validator"
-import { serviceDefinitions } from "./service-definitions"
+import { DeploymentStatusPanel } from "./deployment-status-panel"
+import { TerraformGenerator } from "./terraform-generator"
 
 
 const createNodeTypes = (onNodeDoubleClick: (nodeData: any) => void) => ({
@@ -86,12 +91,18 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const [activeFile, setActiveFile] = useState("main.tf")
-  const [terraformFiles, setTerraformFiles] = useState({
+  const [terraformFiles, setTerraformFiles] = useState<Record<string, string>>({
     "main.tf": "",
     "variables.tf": "",
     "outputs.tf": "",
     "providers.tf": ""
   })
+
+  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus | null>(null)
+  const [isDeploying, setIsDeploying] = useState(false)
+  const [deploymentError, setDeploymentError] = useState<string | null>(null)
+  const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
+  const reactFlowWrapper = useRef<HTMLDivElement>(null)
 
   const providerConfig = {
     aws: {
@@ -108,9 +119,31 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     },
   }
 
+  const [services, setServices] = useState<any[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [servicesLoaded, setServicesLoaded] = useState(false)
+
   const config = providerConfig[provider as keyof typeof providerConfig]
-  const services = Object.values(serviceDefinitions[provider] || {})
-  const categories = [...new Set(services.map((s) => s.category))]
+
+  // Load services from config files
+  useEffect(() => {
+    const loadServices = async () => {
+      try {
+        const serviceConfigs = await ConfigLoader.loadAllConfigs()
+        const providerServices = Object.values(serviceConfigs[provider] || {})
+        setServices(providerServices)
+        setCategories([...new Set(providerServices.map((s) => s.category))])
+        setServicesLoaded(true)
+      } catch (error) {
+        console.error('Failed to load services:', error)
+        setServices([])
+        setCategories([])
+        setServicesLoaded(true)
+      }
+    }
+
+    loadServices()
+  }, [provider])
 
   const onConnect: OnConnect = useCallback(
     (params: Connection | Edge) => {
@@ -266,6 +299,10 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
             : node
         )
       )
+      // Trigger Terraform file regeneration after config update
+      setTimeout(() => {
+        updateMainTf()
+      }, 100)
     }
   }
 
@@ -274,38 +311,116 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     setSelectedNode(null)
   }
 
+  const handleSaveConfig = () => {
+    // Trigger Terraform file regeneration when save is pressed
+    updateAllTerraformFiles()
+    console.log('Configuration saved - Terraform files updated')
+    
+    // Optional: Add visual feedback (could be enhanced with toast notifications)
+    // For now, we'll just log the success
+    console.log('✅ Configuration saved successfully!')
+  }
+
   // Generate Terraform code from nodes
-  const generateTerraformCode = () => {
+  const generateTerraformCode = async () => {
     if (nodes.length === 0) {
       return `# No resources defined yet
 # Drag and drop services from the sidebar to generate Terraform code`
     }
 
-    let terraformCode = `# Generated Terraform configuration\n\n`
-    
-    nodes.forEach((node) => {
-      const service = node.data as any
-      terraformCode += `resource "${service.terraformType}" "${service.id}" {\n`
-      
-      // Add basic configuration
-      if (service.config) {
-        Object.entries(service.config).forEach(([key, value]) => {
-          if (value) {
-            terraformCode += `  ${key} = "${value}"\n`
-          }
-        })
-      }
-      
-      terraformCode += `}\n\n`
-    })
-    
-    return terraformCode
+    try {
+      const terraformGenerator = new TerraformGenerator(provider, nodes, edges)
+      return await terraformGenerator.generateTerraformCode()
+    } catch (error) {
+      console.error('Error generating Terraform code:', error)
+      return `# Error generating Terraform code: ${error}`
+    }
   }
 
-  // Initialize Terraform files with default content
-  const initializeTerraformFiles = () => {
-    const mainTf = generateTerraformCode()
-    const variablesTf = `# Variables for your infrastructure
+  const handleDownloadTerraformCode = (activeFile: string) => {
+    const content = terraformFiles[activeFile];
+    if (!content) {
+      console.error("No content found for this file:", activeFile);
+      return;
+    }
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = activeFile; // use filename
+    link.click();
+
+    // cleanup
+    URL.revokeObjectURL(url);
+
+  }
+
+  // Helper function to generate Terraform files
+  const generateTerraformFiles = async () => {
+    const mainTf = await generateTerraformCode()
+    
+    // Generate separate files using TerraformGenerator
+    let variablesTf: string = ""
+    let outputsTf: string = ""
+    let providersTf: string = ""
+    
+    if (nodes.length > 0) {
+      try {
+        const terraformGenerator = new TerraformGenerator(provider, nodes, edges)
+        const output = await terraformGenerator.generate()
+        
+        // Generate variables.tf
+        if (Object.keys(output.variables).length > 0) {
+          variablesTf = "# Variables\n"
+          Object.entries(output.variables).forEach(([name, config]) => {
+            variablesTf += `variable "${name}" {\n`
+            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
+              if (key === "type" && value === "string") {
+                variablesTf += `  ${key} = ${value}\n`
+              } else if (typeof value === "string") {
+                variablesTf += `  ${key} = "${value}"\n`
+              } else if (typeof value === "boolean") {
+                variablesTf += `  ${key} = ${value}\n`
+              } else {
+                variablesTf += `  ${key} = ${JSON.stringify(value)}\n`
+              }
+            })
+            variablesTf += "}\n\n"
+          })
+        } else {
+          variablesTf = `# Variables for your infrastructure
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+`
+        }
+        
+        // Generate outputs.tf using the dedicated method
+        const generatedOutputsTf = await terraformGenerator.generateOutputsFile()
+        outputsTf = generatedOutputsTf.trim() ? generatedOutputsTf : `# Outputs for your infrastructure
+output "resources_created" {
+  description = "Number of resources created"
+  value       = ${nodes.length}
+}
+`
+        
+        // Generate providers.tf
+        providersTf = terraformGenerator.generateProviderBlock()
+        
+      } catch (error) {
+        console.error('Error generating Terraform files:', error)
+        // Fallback to default content
+        variablesTf = `# Variables for your infrastructure
 variable "region" {
   description = "AWS region"
   type        = string
@@ -319,14 +434,14 @@ variable "environment" {
 }
 `
 
-    const outputsTf = `# Outputs for your infrastructure
+        outputsTf = `# Outputs for your infrastructure
 output "resources_created" {
   description = "Number of resources created"
   value       = ${nodes.length}
 }
 `
 
-    const providersTf = `# Provider configuration
+        providersTf = `# Provider configuration
 terraform {
   required_providers {
     aws = {
@@ -340,6 +455,45 @@ provider "aws" {
   region = var.region
 }
 `
+      }
+    } else {
+      // Default content when no nodes
+      variablesTf = `# Variables for your infrastructure
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+`
+
+      outputsTf = `# Outputs for your infrastructure
+output "resources_created" {
+  description = "Number of resources created"
+  value       = ${nodes.length}
+}
+`
+
+      providersTf = `# Provider configuration
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+}
+`
+    }
 
     setTerraformFiles({
       "main.tf": mainTf,
@@ -362,31 +516,117 @@ provider "aws" {
     setActiveFile(fileName)
   }
 
-  // Update main.tf when nodes change
-  const updateMainTf = () => {
-    const newMainTf = generateTerraformCode()
-    setTerraformFiles(prev => ({
-      ...prev,
-      "main.tf": newMainTf
-    }))
+  // Handle Terraform deployment
+  const handleDeploy = async () => {
+    if (nodes.length === 0) {
+      setDeploymentError("No infrastructure defined. Please add some services to deploy.")
+      return
+    }
+
+    // Check if credentials are configured
+    if (!CredentialManager.hasCredentials(provider as 'aws' | 'gcp' | 'azure')) {
+      setDeploymentError(`No ${provider.toUpperCase()} credentials configured. Please configure credentials in settings.`)
+      return
+    }
+
+    setIsDeploying(true)
+    setDeploymentError(null)
+    setDeploymentStatus(null)
+
+    try {
+      const deploymentRequest = {
+        name: `Infrastructure Deployment ${new Date().toLocaleString()}`,
+        provider: provider as 'aws' | 'gcp' | 'azure',
+        nodes: nodes,
+        edges: edges,
+        autoApprove: false
+      }
+
+      const result = await deployInfrastructure(deploymentRequest)
+      
+      if (result.success) {
+        // Start polling for deployment status
+        startDeploymentPolling(result.deploymentId)
+      } else {
+        setDeploymentError(result.error || 'Deployment failed')
+        setIsDeploying(false)
+      }
+    } catch (error) {
+      setDeploymentError(error instanceof Error ? error.message : 'Unknown error occurred')
+      setIsDeploying(false)
+    }
+  }
+
+  // Poll deployment status
+  const startDeploymentPolling = (deploymentId: string) => {
+    const pollInterval = setInterval(() => {
+      const status = getDeploymentStatus(deploymentId)
+      
+      if (status) {
+        setDeploymentStatus(status)
+        
+        if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+          clearInterval(pollInterval)
+          setIsDeploying(false)
+          
+          if (status.status === 'failed') {
+            setDeploymentError(status.error || 'Deployment failed')
+          }
+        }
+      } else {
+        clearInterval(pollInterval)
+        setIsDeploying(false)
+        setDeploymentError('Deployment status not found')
+      }
+    }, 2000) // Poll every 2 seconds
+
+    // Cleanup interval after 10 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval)
+    }, 600000)
+  }
+
+  // Update all Terraform files when nodes change
+  const updateAllTerraformFiles = async () => {
+    await generateTerraformFiles()
+  }
+
+  // Update main.tf when nodes change (kept for backward compatibility)
+  const updateMainTf = async () => {
+    await updateAllTerraformFiles()
   }
 
   // Initialize files on component mount
   useEffect(() => {
-    initializeTerraformFiles()
+    const initFiles = async () => {
+      await generateTerraformFiles()
+    }
+    initFiles()
   }, [])
 
   // Update main.tf when nodes change
   useEffect(() => {
-    updateMainTf()
+    const updateFiles = async () => {
+      await updateMainTf()
+    }
+    updateFiles()
   }, [nodes])
 
   // Handle keyboard events for delete functionality
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        event.preventDefault()
-        deleteSelectedElements()
+        // Only prevent default if not typing in an input field
+        const target = event.target as HTMLElement
+        const isInputField = target.tagName === 'INPUT' || 
+                            target.tagName === 'TEXTAREA' || 
+                            target.contentEditable === 'true' ||
+                            target.getAttribute('role') === 'textbox'
+        
+        if (!isInputField) {
+          event.preventDefault()
+          deleteSelectedElements()
+        }
       }
     }
 
@@ -411,6 +651,17 @@ provider "aws" {
             </div>
             <span className="text-sm font-medium text-gray-600">aws</span>
           </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowDeploymentStatus(true)}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <History className="w-4 h-4 mr-2" />
+              Deployments
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -427,23 +678,34 @@ provider "aws" {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {services.slice(0, 12).map((service) => (
-                  <div
-                    key={service.id}
-                    className="flex flex-col items-center p-2 hover:bg-purple-50 rounded cursor-grab active:cursor-grabbing border border-gray-200 hover:border-purple-200 transition-colors"
-                    draggable
-                    onDragStart={(event) => onDragStart(event, service)}
-                  >
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm mb-1">
-                      {service.icon.startsWith('/') ? (
-                        <img src={service.icon} alt={service.name} className="w-6 h-6" />
-                      ) : (
-                        <span className="text-lg">{service.icon}</span>
-                      )}
-                    </div>
-                    <span className="text-xs text-gray-700 text-center leading-tight">{service.name}</span>
+                {!servicesLoaded ? (
+                  <div className="col-span-3 flex items-center justify-center p-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                    <span className="ml-2 text-sm text-gray-600">Loading services...</span>
                   </div>
-                ))}
+                ) : services.length === 0 ? (
+                  <div className="col-span-3 flex items-center justify-center p-4">
+                    <span className="text-sm text-gray-600">No services available</span>
+                  </div>
+                ) : (
+                  services.slice(0, 12).map((service) => (
+                    <div
+                      key={service.id}
+                      className="flex flex-col items-center p-2 hover:bg-purple-50 rounded cursor-grab active:cursor-grabbing border border-gray-200 hover:border-purple-200 transition-colors"
+                      draggable
+                      onDragStart={(event) => onDragStart(event, service)}
+                    >
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm mb-1">
+                        {service.icon.startsWith('/') ? (
+                          <img src={service.icon} alt={service.name} className="w-6 h-6" />
+                        ) : (
+                          <span className="text-lg">{service.icon}</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-700 text-center leading-tight">{service.name}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -546,6 +808,7 @@ provider "aws" {
             nodeData={selectedNode}
             serviceConfig={null} // This will be loaded by the configuration panel
             onConfigUpdate={handleConfigUpdate}
+            onSave={handleSaveConfig}
           />
         ) : (
           <aside className="w-80 border-l border-gray-200 bg-gray-50 text-gray-900">
@@ -567,21 +830,79 @@ provider "aws" {
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                  <Button onClick={() => handleDownloadTerraformCode(activeFile)} variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
                     <Download className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-gray-600 hover:text-gray-900"
+                    onClick={handleDeploy}
+                    disabled={isDeploying}
+                  >
                     <Play className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
 
               {/* Code Content */}
-              <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              <div className="flex-1 overflow-auto p-4 bg-gray-50 flex flex-col">
+                {/* Deployment Status */}
+                {(isDeploying || deploymentStatus || deploymentError) && (
+                  <div className="mb-4 p-3 bg-white rounded-lg border">
+                    {isDeploying && deploymentStatus && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-900">
+                            {deploymentStatus.message}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {deploymentStatus.progress}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${deploymentStatus.progress}%` }}
+                          ></div>
+                        </div>
+                        {deploymentStatus.logs.length > 0 && (
+                          <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded max-h-20 overflow-y-auto">
+                            {deploymentStatus.logs.slice(-3).map((log, index) => (
+                              <div key={index} className="mb-1">{log}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {deploymentError && (
+                      <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                        <div className="font-medium">Deployment Error:</div>
+                        <div>{deploymentError}</div>
+                      </div>
+                    )}
+                    
+                    {deploymentStatus?.status === 'completed' && (
+                      <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                        <div className="font-medium">✓ Deployment Completed Successfully!</div>
+                        {deploymentStatus.outputs && (
+                          <div className="mt-2 text-xs">
+                            <div className="font-medium">Outputs:</div>
+                            {Object.entries(deploymentStatus.outputs).map(([key, value]) => (
+                              <div key={key}>{key}: {String(value)}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <textarea
                   value={terraformFiles[activeFile as keyof typeof terraformFiles]}
                   onChange={(e) => handleFileContentChange(e.target.value)}
-                  className="terraform-editor w-full h-full bg-gray-50 text-sm text-gray-900 resize-none border-none outline-none"
+                  className="terraform-editor flex-1 bg-gray-50 text-sm text-gray-900 resize-none border-none outline-none"
                   placeholder="Start typing your Terraform configuration..."
                   spellCheck={false}
                 />
@@ -590,6 +911,12 @@ provider "aws" {
           </aside>
         )}
       </div>
+
+      {/* Deployment Status Panel */}
+      <DeploymentStatusPanel
+        isOpen={showDeploymentStatus}
+        onClose={() => setShowDeploymentStatus(false)}
+      />
     </div>
   )
 }
