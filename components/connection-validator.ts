@@ -60,6 +60,24 @@ export const connectionRules: Record<string, ConnectionRule[]> = {
       description: "RDS must be deployed within a VPC",
       required: true,
     },
+    {
+      sourceType: "lambda",
+      targetType: "sqs",
+      relationship: "consumes",
+      description: "Lambda function can consume messages from SQS queue",
+    },
+    {
+      sourceType: "ec2",
+      targetType: "sqs",
+      relationship: "sends_to",
+      description: "EC2 instances can send messages to SQS queue",
+    },
+    {
+      sourceType: "sqs",
+      targetType: "lambda",
+      relationship: "triggers",
+      description: "SQS queue can trigger Lambda function",
+    },
   ],
   gcp: [
     {

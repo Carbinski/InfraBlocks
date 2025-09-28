@@ -1,8 +1,11 @@
 "use client"
 
+import { useState } from "react"
+import { ReactFlowProvider } from "@xyflow/react"
 
 import { InfrastructureCanvas } from "@/components/infrastructure-canvas"
 import { ProviderSelection } from "@/components/provider-selection"
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,10 +22,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreHorizontal, RefreshCw, Settings, Share, Trash2 } from "lucide-react"
-import { useState } from "react"
+import {
+  ArrowLeft,
+  MoreHorizontal,
+  Settings,
+  Share,
+  RefreshCw,
+  Trash2,
+} from "lucide-react"
 
 interface Project {
   id: string
@@ -42,52 +51,70 @@ interface ProjectViewProps {
   onDeleteProject: (projectId: string) => void
 }
 
-export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject }: ProjectViewProps) {
+// Simple wrapper - canvas now handles AI infrastructure directly
+function InfrastructureCanvasWrapper({
+  provider,
+  onBack,
+  projectId,
+}: {
+  provider: "aws" | "gcp" | "azure"
+  onBack: () => void
+  projectId: string
+}) {
+  console.log("🎨 InfrastructureCanvasWrapper: Rendering canvas with provider:", provider)
+  return (
+    <InfrastructureCanvas
+      provider={provider}
+      onBack={onBack}
+      // If InfrastructureCanvas doesn't accept projectId, delete the next line.
+      projectId={projectId}
+    />
+  )
+}
+
+export function ProjectView({
+  project,
+  onBack,
+  onUpdateProject,
+  onDeleteProject,
+}: ProjectViewProps) {
   const [selectedProvider, setSelectedProvider] = useState<"aws" | "gcp" | "azure" | null>(project.provider || null)
-  const [showCanvas, setShowCanvas] = useState(false)
+  const [showCanvas, setShowCanvas] = useState(!!project.provider)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const handleProviderSelect = (provider: "aws" | "gcp" | "azure") => {
     setSelectedProvider(provider)
-
-    const updatedProject = {
+    onUpdateProject({
       ...project,
       provider,
       lastModified: "Just now",
-    }
-    onUpdateProject(updatedProject)
-    
+    })
     setShowCanvas(true)
   }
 
   const handleProviderChange = () => {
     setSelectedProvider(null)
     setShowCanvas(false)
-
-    const updatedProject = {
+    onUpdateProject({
       ...project,
       provider: undefined,
       lastModified: "Just now",
-    }
-    onUpdateProject(updatedProject)
+    })
   }
 
   const handleBackToProviderSelection = () => {
     setShowCanvas(false)
     setSelectedProvider(null)
-    
-    // Update project to remove provider
-    const updatedProject = {
+    onUpdateProject({
       ...project,
       provider: undefined,
       lastModified: "Just now",
-    }
-    onUpdateProject(updatedProject)
+    })
   }
 
   const handleDeleteProject = () => {
     onDeleteProject(project.id)
-    onBack() 
+    onBack()
   }
 
   return (
@@ -104,7 +131,9 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
               <div className="h-4 w-px bg-border" />
               <div>
                 <h1 className="text-lg font-semibold text-foreground">{project.name}</h1>
-                {project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}
+                {project.description && (
+                  <p className="text-sm text-muted-foreground">{project.description}</p>
+                )}
               </div>
               {selectedProvider && (
                 <Badge variant="secondary" className="ml-2 bg-accent text-accent-foreground">
@@ -112,7 +141,7 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
                 </Badge>
               )}
             </div>
-            
+
             {/* Three dots menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -133,7 +162,7 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh
                 </DropdownMenuItem>
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-destructive"
                   onClick={() => setShowDeleteDialog(true)}
                 >
@@ -150,15 +179,29 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
               <div className="max-w-4xl mx-auto">
                 <ProviderSelection onProviderSelect={handleProviderSelect} />
               </div>
-            ) : null}
+            ) : (
+              <div className="max-w-4xl mx-auto text-center py-8">
+                <p className="text-muted-foreground">Loading infrastructure canvas...</p>
+                <Button variant="ghost" size="sm" className="mt-4" onClick={handleProviderChange}>
+                  Change provider
+                </Button>
+              </div>
+            )}
           </main>
         </div>
       ) : (
-        <InfrastructureCanvas
-          provider={selectedProvider!}
-          onBack={handleBackToProviderSelection}
-          projectId={project.id}
-        />
+        <>
+          {console.log("🎨 ProjectView: Rendering canvas with provider:", selectedProvider)}
+          <ReactFlowProvider>
+            {selectedProvider && (
+              <InfrastructureCanvasWrapper
+                provider={selectedProvider}
+                onBack={handleBackToProviderSelection}
+                projectId={project.id}
+              />
+            )}
+          </ReactFlowProvider>
+        </>
       )}
 
       {/* Delete Confirmation Dialog */}
