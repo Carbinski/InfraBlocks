@@ -213,6 +213,42 @@ export class TerraformGenerator {
           },
         }
 
+      case "api_gateway":
+        return {
+          name: config.name || "api",
+          description: config.description || "REST API",
+          endpoint_configuration: config.endpoint_configuration ? {
+            types: [config.endpoint_configuration],
+          } : {
+            types: ["REGIONAL"],
+          },
+        }
+
+      case "dynamodb":
+        return {
+          name: config.table_name || `${this.sanitizeName(node.data.name as string)}-table`,
+          billing_mode: config.billing_mode || "PAY_PER_REQUEST",
+          hash_key: config.hash_key || "id",
+          ...(config.range_key && { range_key: config.range_key }),
+          ...(config.billing_mode === "PROVISIONED" && {
+            read_capacity: Number.parseInt(config.read_capacity) || 5,
+            write_capacity: Number.parseInt(config.write_capacity) || 5,
+          }),
+          ...(config.point_in_time_recovery && {
+            point_in_time_recovery: {
+              enabled: config.point_in_time_recovery,
+            },
+          }),
+          ...(config.stream_enabled && {
+            stream_enabled: config.stream_enabled,
+            stream_view_type: "NEW_AND_OLD_IMAGES",
+          }),
+          tags: {
+            Name: config.name || node.data.name,
+            Environment: "terraform-generated",
+          },
+        }
+
       case "s3":
         return {
           bucket: config.bucket_name || `${this.sanitizeName(node.data.name as string)}-bucket-${Date.now()}`,
@@ -461,12 +497,40 @@ export class TerraformGenerator {
           }
           break
 
+        case "api_gateway":
+        case "gateway":
+          outputs[`${resourceName}_id`] = {
+            description: `ID of ${node.data.name as string} API Gateway`,
+            value: `${resourceType}.${resourceName}.id`,
+          }
+          outputs[`${resourceName}_arn`] = {
+            description: `ARN of ${node.data.name as string} API Gateway`,
+            value: `${resourceType}.${resourceName}.arn`,
+          }
+          outputs[`${resourceName}_execution_arn`] = {
+            description: `Execution ARN of ${node.data.name as string} API Gateway`,
+            value: `${resourceType}.${resourceName}.execution_arn`,
+          }
+          break
+
         case "s3":
         case "storage":
         case "blob":
           outputs[`${resourceName}_bucket_name`] = {
             description: `Name of ${node.data.name as string} bucket`,
             value: `${resourceType}.${resourceName}.bucket`,
+          }
+          break
+
+        case "dynamodb":
+        case "database":
+          outputs[`${resourceName}_table_name`] = {
+            description: `Name of ${node.data.name as string} DynamoDB table`,
+            value: `${resourceType}.${resourceName}.name`,
+          }
+          outputs[`${resourceName}_table_arn`] = {
+            description: `ARN of ${node.data.name as string} DynamoDB table`,
+            value: `${resourceType}.${resourceName}.arn`,
           }
           break
 
@@ -722,7 +786,7 @@ resource "azurerm_resource_group" "main" {
         if (key === "tags" || parentKey === "tags") {
           // Tags should always be arguments
           result += `${spaces}${key} = {\n`
-        } else if (key === "versioning" || key === "lifecycle" || key === "provisioner") {
+        } else if (key === "versioning" || key === "lifecycle" || key === "provisioner" || key === "point_in_time_recovery") {
           // These should be blocks
           result += `${spaces}${key} {\n`
         } else {
