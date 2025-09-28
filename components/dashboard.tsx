@@ -460,8 +460,8 @@ export function Dashboard() {
                             <span className="font-medium text-gray-900">{project.architectures}</span>
                           </div>
                           <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">Last modified</span>
-                            <span className="font-medium text-gray-900">{project.lastModified}</span>
+                            {/* <span className="text-gray-600">Last modified</span>
+                            <span className="font-medium text-gray-900">{project.lastModified}</span> */}
                           </div>
                           {project.provider && (
                             <div className="flex items-center justify-between text-sm">

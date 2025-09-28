@@ -196,7 +196,7 @@ export function ProjectView({
             {selectedProvider && (
               <InfrastructureCanvasWrapper
                 provider={selectedProvider}
-                onBack={handleBackToProviderSelection}
+                onBack={onBack}
                 projectId={project.id}
               />
             )}
