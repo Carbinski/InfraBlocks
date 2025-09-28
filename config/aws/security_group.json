@@ -1,0 +1,71 @@
+{
+  "id": "security_group",
+  "name": "Security Group",
+  "icon": "/aws/ec2.svg",
+  "category": "Network",
+  "description": "Security group for controlling network access",
+  "terraformType": "aws_security_group",
+  "defaultConfig": {
+    "name": "web-security-group",
+    "description": "Security group for web servers",
+    "vpc_id": ""
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "Name",
+      "description": "Name of the security group",
+      "default": "web-security-group",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "label": "Description",
+      "description": "Description of the security group",
+      "default": "Security group for web servers",
+      "required": false
+    },
+    "vpc_id": {
+      "type": "string",
+      "label": "VPC ID",
+      "description": "ID of the VPC to associate with",
+      "required": false
+    },
+    "ingress": {
+      "type": "array",
+      "label": "Inbound Rules",
+      "description": "List of inbound security rules",
+      "required": false,
+      "items": {
+        "type": "object",
+        "properties": {
+          "from_port": { "type": "number", "label": "From Port" },
+          "to_port": { "type": "number", "label": "To Port" },
+          "protocol": { "type": "string", "label": "Protocol", "default": "tcp" },
+          "cidr_blocks": { "type": "array", "label": "CIDR Blocks", "items": { "type": "string" } }
+        }
+      }
+    },
+    "egress": {
+      "type": "array",
+      "label": "Outbound Rules",
+      "description": "List of outbound security rules",
+      "required": false,
+      "items": {
+        "type": "object",
+        "properties": {
+          "from_port": { "type": "number", "label": "From Port" },
+          "to_port": { "type": "number", "label": "To Port" },
+          "protocol": { "type": "string", "label": "Protocol", "default": "tcp" },
+          "cidr_blocks": { "type": "array", "label": "CIDR Blocks", "items": { "type": "string" } }
+        }
+      }
+    },
+    "tags": {
+      "type": "string",
+      "label": "Tags",
+      "description": "JSON string of tags to apply",
+      "required": false
+    }
+  }
+}

@@ -22,9 +22,9 @@ import {
 } from "@/components/ui/select"
 import { CredentialManager, type AWSCredentials, type AzureCredentials, type GCPCredentials } from "@/lib/credential-manager"
 import { testCredentials } from "@/lib/api-service"
+// Remove the separate persistence import - we'll use localStorage directly
 import { cn } from "@/lib/utils"
 import {
-  Archive,
   Brain,
   Copy,
   Edit,
@@ -48,16 +48,21 @@ interface Project {
   lastModified: string
   status: "active" | "archived"
   createdAt: string
+  // Canvas state stored directly in project
+  canvasState?: {
+    nodes: any[]
+    edges: any[]
+    lastSaved: string
+  }
 }
 
-const initialProjects: Project[] = []
-
 export function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>(initialProjects)
+  const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [activeTab, setActiveTab] = useState<string>("home")
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   
   // Credential states
   const [awsCredentials, setAwsCredentials] = useState<Partial<AWSCredentials>>({})
@@ -89,11 +94,9 @@ export function Dashboard() {
   }
 
   const handleDeleteProject = (projectId: string) => {
-    setProjects(projects.filter((p) => p.id !== projectId))
-  }
-
-  const handleArchiveProject = (projectId: string) => {
-    setProjects(projects.map((p) => (p.id === projectId ? { ...p, status: "archived" as const } : p)))
+    const updatedProjects = projects.filter((p) => p.id !== projectId)
+    setProjects(updatedProjects)
+    localStorage.setItem('infrastructure-designer-projects', JSON.stringify(updatedProjects))
   }
 
   const handleDuplicateProject = (project: Project) => {
@@ -108,6 +111,8 @@ export function Dashboard() {
     setProjects([newProject, ...projects])
   }
 
+
+
   const handleCreateProject = (projectData: Omit<Project, "id" | "lastModified" | "createdAt">) => {
     const newProject: Project = {
       ...projectData,
@@ -115,7 +120,10 @@ export function Dashboard() {
       lastModified: "Just now",
       createdAt: new Date().toISOString().split("T")[0],
     }
-    setProjects([newProject, ...projects])
+    
+    const updatedProjects = [newProject, ...projects]
+    setProjects(updatedProjects)
+    localStorage.setItem('infrastructure-designer-projects', JSON.stringify(updatedProjects))
     setSelectedProject(newProject)
   }
 
@@ -125,8 +133,21 @@ export function Dashboard() {
     }
   }
 
-  // Load credentials on component mount
+  // Load projects and credentials on component mount
   useEffect(() => {
+    const loadProjects = () => {
+      try {
+        const savedProjects = localStorage.getItem('infrastructure-designer-projects')
+        if (savedProjects) {
+          const projects = JSON.parse(savedProjects)
+          setProjects(projects)
+          console.log(`Loaded ${projects.length} projects from storage`)
+        }
+      } catch (error) {
+        console.error('Failed to load projects:', error)
+      }
+    }
+    
     const loadCredentials = () => {
       const aws = CredentialManager.getCredentials('aws')
       const gcp = CredentialManager.getCredentials('gcp')
@@ -137,8 +158,23 @@ export function Dashboard() {
       if (azure) setAzureCredentials(azure)
     }
     
+    loadProjects()
     loadCredentials()
   }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openDropdownId && !(event.target as Element).closest('[data-dropdown]')) {
+        setOpenDropdownId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openDropdownId])
 
   // AWS credential handlers
   const handleSaveAWSCredentials = async () => {
@@ -232,7 +268,7 @@ export function Dashboard() {
           setProjects(projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)))
           setSelectedProject(updatedProject)
         }}
-        onDeleteProject={handleDeleteProject}
+        onDeleteProject={(projectId) => setProjects(projects.filter((p) => p.id !== projectId))}
       />
     )
   }
@@ -335,67 +371,81 @@ export function Dashboard() {
                   </Card>
 
                   {filteredProjects.map((project) => (
-                    <Card
-                      key={project.id}
-                      className="cursor-pointer hover:shadow-md transition-shadow bg-white"
-                      onClick={() => handleProjectSelect(project)}
-                    >
+                     <Card
+                       key={project.id}
+                       className="cursor-pointer hover:shadow-md transition-shadow bg-white"
+                       onClick={(e) => {
+                         // Only handle card click if not clicking on dropdown
+                         if (!(e.target as HTMLElement).closest('[data-radix-dropdown-menu-trigger]')) {
+                           handleProjectSelect(project)
+                         }
+                       }}
+                     >
                       <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <CardTitle className="text-base text-gray-900">{project.name}</CardTitle>
-                            {project.description && (
-                              <CardDescription className="mt-1 text-gray-600">{project.description}</CardDescription>
-                            )}
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleProjectSelect(project)
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Open Project
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDuplicateProject(project)
-                                }}
-                              >
-                                <Copy className="w-4 h-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleArchiveProject(project.id)
-                                }}
-                              >
-                                <Archive className="w-4 h-4 mr-2" />
-                                Archive
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteProject(project.id)
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                         <div className="flex items-start justify-between">
+                           <div className="flex-1">
+                             <CardTitle className="text-base text-gray-900">{project.name}</CardTitle>
+                             {project.description && (
+                               <CardDescription className="mt-1 text-gray-600">{project.description}</CardDescription>
+                             )}
+                           </div>
+                           <div className="relative" data-dropdown>
+                             <Button 
+                               variant="ghost" 
+                               size="sm" 
+                               className="hover:bg-gray-100"
+                               onClick={(e) => {
+                                 e.stopPropagation()
+                                 setOpenDropdownId(openDropdownId === project.id ? null : project.id)
+                                 console.log('Three dots clicked, dropdown:', openDropdownId === project.id ? 'closing' : 'opening')
+                               }}
+                             >
+                               <MoreHorizontal className="w-4 h-4" />
+                             </Button>
+                             
+                             {openDropdownId === project.id && (
+                               <div className="absolute right-0 top-8 z-[100] min-w-[160px] bg-white border border-gray-200 shadow-lg rounded-md" data-dropdown>
+                                 <div
+                                   className="flex items-center px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+                                   onClick={(e) => {
+                                     e.stopPropagation()
+                                     console.log('Open project clicked')
+                                     setOpenDropdownId(null)
+                                     handleProjectSelect(project)
+                                   }}
+                                 >
+                                   <Edit className="w-4 h-4 mr-2" />
+                                   Open Project
+                                 </div>
+                                 <div
+                                   className="flex items-center px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+                                   onClick={(e) => {
+                                     e.stopPropagation()
+                                     console.log('Duplicate clicked')
+                                     setOpenDropdownId(null)
+                                     handleDuplicateProject(project)
+                                   }}
+                                 >
+                                   <Copy className="w-4 h-4 mr-2" />
+                                   Duplicate
+                                 </div>
+                                 <div className="border-t border-gray-200 my-1"></div>
+                                 <div
+                                   className="flex items-center px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer text-red-600"
+                                   onClick={(e) => {
+                                     e.stopPropagation()
+                                     console.log('Delete clicked')
+                                     setOpenDropdownId(null)
+                                     handleDeleteProject(project.id)
+                                   }}
+                                 >
+                                   <Trash2 className="w-4 h-4 mr-2" />
+                                   Delete
+                                 </div>
+                               </div>
+                             )}
+                           </div>
+                         </div>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">

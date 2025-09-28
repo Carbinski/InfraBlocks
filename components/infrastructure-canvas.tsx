@@ -36,7 +36,9 @@ import {
   History,
   Play,
   Pin,
-  Brain
+  Brain,
+  Save,
+  Clock
 } from "lucide-react"
 import GlassyPaneContainer from '@/src/cedar/components/containers/GlassyPaneContainer'
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
@@ -47,8 +49,12 @@ import { DeploymentStatusPanel } from "./deployment-status-panel"
 import { TerraformGenerator } from "./terraform-generator"
 import { UndoRedoControls } from "./undo-redo-controls"
 import { useCanvasHistory } from "@/hooks/use-canvas-history"
+import { ProjectCanvasUtils } from "@/lib/project-canvas-utils"
+import { registerCanvasFunctions, unregisterCanvasFunctions } from "@/lib/infrastructure-manager"
+import { AgentChat } from "@/components/agent-chat"
 
 import { AIReviewDialog } from "./ai-review-dialog"
+import { SaveStatusIndicator } from "./save-status-indicator"
 
 
 const createNodeTypes = (onNodeDoubleClick: (nodeData: any) => void) => ({
@@ -73,15 +79,52 @@ const defaultEdgeOptions = {
 let nodeId = 0
 const getId = () => `node_${nodeId++}`
 
-export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasProps) {
+export function InfrastructureCanvas({ provider, onBack, projectId }: InfrastructureCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([])
   
   // Initialize undo/redo functionality
-  const { canUndo, canRedo, undo, redo, saveState, getCurrentState, historyLength, currentIndex } = useCanvasHistory()
+  const { canUndo, canRedo, undo, redo, saveState, getCurrentState, historyLength, currentIndex, initializeHistory } = useCanvasHistory()
+  
+  // Canvas state management
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<string | null>(null)
+
+  // Save current canvas state to project
+  const saveCurrentState = useCallback(() => {
+    if (projectId) {
+      setIsSaving(true)
+      ProjectCanvasUtils.saveCanvasState(projectId, nodes, edges)
+      setLastSaved(new Date().toISOString())
+      
+      setTimeout(() => setIsSaving(false), 1000) // Show saving indicator briefly
+      console.log('💾 Canvas state saved to project')
+    }
+  }, [projectId, nodes, edges])
+
+  // Check for unsaved changes
+  const hasUnsavedChanges = useCallback((): boolean => {
+    if (!projectId) return false
+    return ProjectCanvasUtils.hasUnsavedChanges(projectId, nodes, edges)
+  }, [projectId, nodes, edges])
   
   // Track if we're syncing from history to prevent conflicts
   const isSyncingFromHistory = useRef(false)
+
+  // Load saved state when project opens
+  useEffect(() => {
+    if (projectId) {
+      const savedState = ProjectCanvasUtils.loadCanvasState(projectId)
+      if (savedState) {
+        console.log('Loading saved canvas state for project:', projectId)
+        setNodes(savedState.nodes)
+        setEdges(savedState.edges)
+        // Initialize history with the loaded state as the initial state
+        initializeHistory(savedState.nodes, savedState.edges)
+        setLastSaved(new Date().toISOString())
+      }
+    }
+  }, [projectId, initializeHistory])
 
   // Sync state with history when undo/redo is performed
   useEffect(() => {
@@ -97,6 +140,44 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
       }, 100)
     }
   }, [currentIndex]) // Only depend on currentIndex, not the function
+
+  // Canvas add functions for AI infrastructure creation
+  const addNodesToCanvas = useCallback((newNodes: Node[]) => {
+    console.log('🎯 Canvas: AI adding nodes directly to canvas:', newNodes.length)
+
+    setNodes((currentNodes) => {
+      console.log('📊 Canvas: Current nodes:', currentNodes.length, 'Adding:', newNodes.length)
+      const updatedNodes = [...currentNodes, ...newNodes]
+      console.log('📊 Canvas: New total nodes:', updatedNodes.length)
+      return updatedNodes
+    })
+  }, [])
+
+  const addEdgesToCanvas = useCallback((newEdges: Edge[]) => {
+    console.log('🔗 Canvas: AI adding edges directly to canvas:', newEdges.length)
+    setEdges((currentEdges) => {
+      console.log('📊 Canvas: Current edges:', currentEdges.length, 'Adding:', newEdges.length)
+      const updatedEdges = [...currentEdges, ...newEdges]
+      console.log('📊 Canvas: New total edges:', updatedEdges.length)
+      return updatedEdges
+    })
+  }, [])
+
+  // Get canvas state function
+  const getCanvasState = useCallback(() => {
+    return { nodes, edges }
+  }, [nodes, edges])
+
+  // Register canvas functions for AI infrastructure creation
+  useEffect(() => {
+    console.log('🎨 Infrastructure Canvas: Registering functions for AI')
+    registerCanvasFunctions(addNodesToCanvas, addEdgesToCanvas, getCanvasState)
+
+    return () => {
+      console.log('🎨 Infrastructure Canvas: Unregistering functions')
+      unregisterCanvasFunctions()
+    }
+  }, [addNodesToCanvas, addEdgesToCanvas, getCanvasState])
 
   // Debug: Log edges changes
   useEffect(() => {
@@ -135,6 +216,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [isProgressVisible, setIsProgressVisible] = useState<boolean>(true)
   const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
   const [isAIReviewOpen, setIsAIReviewOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
   const [isAIReviewLoading, setIsAIReviewLoading] = useState(false)
   const [aiReviewError, setAiReviewError] = useState<string | null>(null)
@@ -478,16 +560,19 @@ variable "environment" {
 `
         }
         
-        // Generate outputs.tf from the generator output
-        if (Object.keys(output.outputs).length > 0) {
+        // Generate outputs.tf
+        const terraformOutput = terraformGenerator.generate()
+        if (Object.keys(terraformOutput.outputs).length > 0) {
           outputsTf = "# Outputs\n"
-          Object.entries(output.outputs).forEach(([name, config]) => {
+          Object.entries(terraformOutput.outputs).forEach(([name, config]) => {
             outputsTf += `output "${name}" {\n`
             Object.entries(config as Record<string, any>).forEach(([key, value]) => {
               if (typeof value === "string") {
                 outputsTf += `  ${key} = "${value}"\n`
-              } else {
+              } else if (typeof value === "boolean") {
                 outputsTf += `  ${key} = ${value}\n`
+              } else {
+                outputsTf += `  ${key} = ${JSON.stringify(value)}\n`
               }
             })
             outputsTf += "}\n\n"
@@ -785,10 +870,10 @@ provider "aws" {
   return (
     <div className="h-screen bg-white flex flex-col">
       {/* Top Header */}
-      <header className="h-12 border-b border-gray-200 bg-white flex items-center px-4">
+      <header className="h-14 border-b border-gray-200 bg-white flex items-center px-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={onBack} className="text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="w-4 h- mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
@@ -806,6 +891,21 @@ provider "aws" {
               showCounts={true}
               historyLength={historyLength}
               currentIndex={currentIndex}
+            />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={saveCurrentState}
+              disabled={!hasUnsavedChanges()}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSaving ? 'Saving...' : 'Save'}
+            </Button>
+            <SaveStatusIndicator
+              isAutoSaving={isSaving}
+              hasUnsavedChanges={hasUnsavedChanges()}
+              lastSaved={lastSaved}
             />
             <Button 
               variant="ghost" 
@@ -962,6 +1062,7 @@ provider "aws" {
                 </GlassyPaneContainer>
               </div>
             </div>
+
           </div>
         </main>
 
@@ -1116,6 +1217,40 @@ provider "aws" {
         isLoading={isAIReviewLoading}
         error={aiReviewError}
       />
+
+      {/* Floating Chat Widget */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {isChatOpen ? (
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 w-[520px] h-[500px] flex flex-col">
+            <div className="flex items-center justify-between p-3 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                  <Brain className="w-4 h-4 text-white" />
+                </div>
+                <span className="font-medium text-gray-900">AI Assistant</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsChatOpen(false)}
+                className="h-6 w-6 p-0 hover:bg-gray-100"
+              >
+                <span className="text-gray-500 text-lg leading-none">×</span>
+              </Button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <AgentChat />
+            </div>
+          </div>
+        ) : (
+          <Button
+            onClick={() => setIsChatOpen(true)}
+            className="w-14 h-14 rounded-full bg-orange-500 hover:bg-orange-600 shadow-lg flex items-center justify-center"
+          >
+            <Brain className="w-6 h-6 text-white" />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
