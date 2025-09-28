@@ -13,6 +13,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { CredentialManager, type AWSCredentials, type AzureCredentials, type GCPCredentials } from "@/lib/credential-manager"
 import { testCredentials } from "@/lib/api-service"
 import { cn } from "@/lib/utils"
@@ -284,12 +291,6 @@ export function Dashboard() {
       <div className="flex-1 flex flex-col relative z-0">
         {/* Header */}
         <header className="h-16 border-b border-gray-200 bg-white px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <h1 className="text-xl font-semibold text-gray-900">Good evening, Lalit! 👋</h1>
-          </div>
         </header>
 
         {/* Content Area */}
@@ -467,12 +468,30 @@ export function Dashboard() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-700">Region</label>
-                      <Input 
-                        placeholder="us-east-1" 
-                        className="mt-1"
-                        value={awsCredentials.region || ''}
-                        onChange={(e) => setAwsCredentials(prev => ({ ...prev, region: e.target.value }))}
-                      />
+                      <Select 
+                        value={awsCredentials.region || 'us-east-1'} 
+                        onValueChange={(value) => setAwsCredentials(prev => ({ ...prev, region: value }))}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select a region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="us-east-1">US East (N. Virginia) - us-east-1</SelectItem>
+                          <SelectItem value="us-east-2">US East (Ohio) - us-east-2</SelectItem>
+                          <SelectItem value="us-west-1">US West (N. California) - us-west-1</SelectItem>
+                          <SelectItem value="us-west-2">US West (Oregon) - us-west-2</SelectItem>
+                          <SelectItem value="eu-west-1">Europe (Ireland) - eu-west-1</SelectItem>
+                          <SelectItem value="eu-west-2">Europe (London) - eu-west-2</SelectItem>
+                          <SelectItem value="eu-west-3">Europe (Paris) - eu-west-3</SelectItem>
+                          <SelectItem value="eu-central-1">Europe (Frankfurt) - eu-central-1</SelectItem>
+                          <SelectItem value="ap-southeast-1">Asia Pacific (Singapore) - ap-southeast-1</SelectItem>
+                          <SelectItem value="ap-southeast-2">Asia Pacific (Sydney) - ap-southeast-2</SelectItem>
+                          <SelectItem value="ap-northeast-1">Asia Pacific (Tokyo) - ap-northeast-1</SelectItem>
+                          <SelectItem value="ap-northeast-2">Asia Pacific (Seoul) - ap-northeast-2</SelectItem>
+                          <SelectItem value="ca-central-1">Canada (Central) - ca-central-1</SelectItem>
+                          <SelectItem value="sa-east-1">South America (São Paulo) - sa-east-1</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     
                     {/* Error messages */}

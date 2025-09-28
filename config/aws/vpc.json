@@ -1,7 +1,7 @@
 {
   "id": "vpc",
   "name": "VPC",
-  "icon": "🌐",
+  "icon": "/aws/vpc.svg",
   "category": "Network",
   "description": "Virtual private cloud",
   "terraformType": "aws_vpc",
