@@ -123,6 +123,7 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
         </div>
       ) : (
         <InfrastructureCanvas
+          projectId={project.id}
           provider={selectedProvider!}
           onBack={onBack}
         />

@@ -39,7 +39,7 @@ import {
   Brain
 } from "lucide-react"
 import GlassyPaneContainer from '@/src/cedar/components/containers/GlassyPaneContainer'
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react"
 import { CloudServiceNode } from "./cloud-service-node"
 import { ConfigurationPanel } from "./configuration-panel"
 import { getConnectionSuggestions, validateConnection } from "./connection-validator"
@@ -71,17 +71,75 @@ const defaultEdgeOptions = {
 }
 
 let nodeId = 0
-const getId = () => `node_${nodeId++}`
+const getId = () => {
+  const cryptoApi = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined
 
-export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasProps) {
+  if (cryptoApi?.randomUUID) {
+    return `node_${cryptoApi.randomUUID()}`
+  }
+
+  return `node_${nodeId++}`
+}
+
+export function InfrastructureCanvas({ projectId, provider, onBack }: InfrastructureCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([])
   
   // Initialize undo/redo functionality
-  const { canUndo, canRedo, undo, redo, saveState, getCurrentState, historyLength, currentIndex } = useCanvasHistory()
+  const { canUndo, canRedo, undo, redo, saveState, clearHistory, getCurrentState, historyLength, currentIndex } = useCanvasHistory()
   
   // Track if we're syncing from history to prevent conflicts
   const isSyncingFromHistory = useRef(false)
+  const hasLoadedState = useRef(false)
+  const storageKey = useMemo(() => `infrastructure_canvas_${projectId}`, [projectId])
+
+  useEffect(() => {
+    hasLoadedState.current = false
+    clearHistory()
+
+    if (typeof window === "undefined") {
+      setNodes([])
+      setEdges([])
+      hasLoadedState.current = true
+      return
+    }
+
+    let persistedNodes: Node[] = []
+    let persistedEdges: Edge[] = []
+    let hasPersistedData = false
+
+    try {
+      const storedState = window.localStorage.getItem(storageKey)
+      if (storedState) {
+        const parsedState = JSON.parse(storedState)
+        if (Array.isArray(parsedState.nodes)) {
+          persistedNodes = parsedState.nodes
+        }
+        if (Array.isArray(parsedState.edges)) {
+          persistedEdges = parsedState.edges
+        }
+        if (persistedNodes.length > 0 || persistedEdges.length > 0) {
+          hasPersistedData = true
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load persisted canvas state:', error)
+    }
+
+    setNodes(hasPersistedData ? persistedNodes : [])
+    setEdges(hasPersistedData ? persistedEdges : [])
+
+    if (hasPersistedData) {
+      window.setTimeout(() => {
+        if (!isSyncingFromHistory.current) {
+          saveState(persistedNodes, persistedEdges, 'load_persisted_state')
+        }
+        hasLoadedState.current = true
+      }, 0)
+    } else {
+      hasLoadedState.current = true
+    }
+  }, [storageKey, clearHistory, saveState, setEdges, setNodes])
 
   // Sync state with history when undo/redo is performed
   useEffect(() => {
@@ -112,6 +170,19 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     console.log('Nodes updated:', nodes)
     console.log('Nodes length:', nodes.length)
   }, [nodes])
+
+  useEffect(() => {
+    if (!hasLoadedState.current || typeof window === "undefined") {
+      return
+    }
+
+    try {
+      const serializedState = JSON.stringify({ nodes, edges })
+      window.localStorage.setItem(storageKey, serializedState)
+    } catch (error) {
+      console.error('Failed to persist canvas state:', error)
+    }
+  }, [nodes, edges, storageKey])
 
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -1068,4 +1139,3 @@ provider "aws" {
     </div>
   )
 }
-

@@ -70,6 +70,7 @@ export interface ConfigurationPanelProps {
 export type CloudProvider = "aws" | "gcp" | "azure"
 
 export interface InfrastructureCanvasProps {
+  projectId: string
   provider: CloudProvider
   onBack: () => void
 }
