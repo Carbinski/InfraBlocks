@@ -77,7 +77,6 @@ export function Dashboard() {
 
   const sidebarItems = [
     { id: "home", label: "Home", icon: Home },
-    { id: "templates", label: "Templates", icon: FileText },
     { id: "settings", label: "Settings", icon: Settings },
   ]
 
@@ -635,12 +634,6 @@ export function Dashboard() {
             </div>
           )}
 
-          {/* Templates tab content */}
-          {activeTab === "templates" && (
-            <div className="flex items-center justify-center h-64">
-              <p className="text-muted-foreground">Templates content coming soon...</p>
-            </div>
-          )}
         </main>
       </div>
 
