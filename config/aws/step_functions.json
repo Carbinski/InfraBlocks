@@ -1,0 +1,45 @@
+{
+  "id": "step_functions",
+  "name": "Step Functions",
+  "icon": "/aws/Arch_AWS-Step-Functions_64.svg",
+  "category": "Integration",
+  "description": "Workflow orchestration service",
+  "terraformType": "aws_sfn_state_machine",
+  "defaultConfig": {
+    "name": "state-machine",
+    "definition": "{\"Comment\": \"A simple state machine\", \"StartAt\": \"HelloWorld\", \"States\": {\"HelloWorld\": {\"Type\": \"Pass\", \"Result\": \"Hello World!\", \"End\": true}}}",
+    "role_arn": ""
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "State Machine Name",
+      "description": "The name of the Step Functions state machine",
+      "required": true
+    },
+    "definition": {
+      "type": "string",
+      "label": "State Machine Definition",
+      "description": "JSON definition of the state machine",
+      "required": true
+    },
+    "role_arn": {
+      "type": "string",
+      "label": "Role ARN",
+      "description": "IAM role ARN for the state machine",
+      "required": true
+    },
+    "logging_configuration": {
+      "type": "string",
+      "label": "Logging Configuration",
+      "description": "JSON string of logging configuration",
+      "required": false
+    },
+    "tracing_configuration": {
+      "type": "string",
+      "label": "Tracing Configuration",
+      "description": "JSON string of tracing configuration",
+      "required": false
+    }
+  }
+}

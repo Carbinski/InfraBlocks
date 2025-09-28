@@ -1,0 +1,45 @@
+{
+  "id": "subnet",
+  "name": "Subnet",
+  "icon": "🔗",
+  "category": "Network",
+  "description": "Subnet within a VPC",
+  "terraformType": "aws_subnet",
+  "defaultConfig": {
+    "cidr_block": "10.0.1.0/24",
+    "availability_zone": "us-east-1a",
+    "map_public_ip_on_launch": false
+  },
+  "configSchema": {
+    "cidr_block": {
+      "type": "string",
+      "label": "CIDR Block",
+      "description": "The CIDR block for the subnet",
+      "default": "10.0.1.0/24",
+      "required": true,
+      "validation": {
+        "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+      }
+    },
+    "availability_zone": {
+      "type": "select",
+      "label": "Availability Zone",
+      "description": "The availability zone for the subnet",
+      "options": ["us-east-1a", "us-east-1b", "us-east-1c", "us-west-1a", "us-west-1b", "us-west-2a", "us-west-2b", "us-west-2c"],
+      "default": "us-east-1a",
+      "required": true
+    },
+    "map_public_ip_on_launch": {
+      "type": "boolean",
+      "label": "Map Public IP on Launch",
+      "description": "Whether to map a public IP on launch",
+      "default": false
+    },
+    "tags": {
+      "type": "string",
+      "label": "Tags",
+      "description": "JSON string of tags to apply",
+      "required": false
+    }
+  }
+}

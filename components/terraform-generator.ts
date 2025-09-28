@@ -55,19 +55,124 @@ export class TerraformGenerator {
 
       // Add additional resources for specific services
       if (node.data.id === 's3') {
+        const resourceName = this.sanitizeName((node.data.name as string) || (node.data.id as string))
+        const terraformType = node.data.terraformType as string
+        const bucketReference = `${terraformType}.${resourceName}`
+
         // Add public access block for S3 buckets
         resources.push({
           type: 'aws_s3_bucket_public_access_block',
-          name: this.sanitizeName((node.data.name as string) || (node.data.id as string)),
+          name: resourceName,
           config: {
-            bucket: `${node.data.terraformType as string}.${this.sanitizeName((node.data.name as string) || (node.data.id as string))}.id`,
+            bucket: `${bucketReference}.id`,
             block_public_acls: true,
             block_public_policy: true,
             ignore_public_acls: true,
             restrict_public_buckets: true,
           },
-          dependencies: [`${node.data.terraformType as string}.${this.sanitizeName((node.data.name as string) || (node.data.id as string))}`],
+          dependencies: [bucketReference],
         })
+
+        // Add versioning resource for S3 buckets
+        const versioningEnabled = (node.data.config as any)?.versioning === "Enabled"
+        if (versioningEnabled !== undefined) {
+          resources.push({
+            type: 'aws_s3_bucket_versioning',
+            name: `${resourceName}_versioning`,
+            config: {
+              bucket: `${bucketReference}.id`,
+              versioning_configuration: {
+                status: versioningEnabled ? "Enabled" : "Disabled",
+              },
+            },
+            dependencies: [bucketReference],
+          })
+        }
+      }
+
+      if (node.data.id === 'lambda') {
+        // Add IAM role for Lambda function
+        const resourceName = this.sanitizeName((node.data.name as string) || (node.data.id as string))
+        resources.push({
+          type: 'aws_iam_role',
+          name: `${resourceName}_role`,
+          config: {
+            name: `${resourceName}-execution-role`,
+            assume_role_policy: `jsonencode({
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+})`,
+            tags: {
+              Name: `${node.data.name as string}-role`,
+              Environment: "terraform-generated",
+            },
+          },
+          dependencies: [],
+        })
+
+        // Add basic execution policy to IAM role
+        resources.push({
+          type: 'aws_iam_role_policy_attachment',
+          name: `${resourceName}_basic_execution`,
+          config: {
+            role: `aws_iam_role.${resourceName}_role.name`,
+            policy_arn: "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          },
+          dependencies: [`aws_iam_role.${resourceName}_role`],
+        })
+
+        // Create default Lambda function ZIP file if using inline code
+        const config = node.data.config as any
+        const useInlineCode = !config?.s3_bucket && !config?.s3_key
+        if (useInlineCode) {
+          // Create a simple archive resource for the Lambda function
+          resources.push({
+            type: 'archive_file',
+            name: `${resourceName}_lambda_zip`,
+            config: {
+              type: "zip",
+              output_path: `lambda-${resourceName}.zip`,
+              source: {
+                content: `exports.handler = async (event) => {
+  console.log('Event:', JSON.stringify(event, null, 2));
+
+  return {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+    },
+    body: JSON.stringify({
+      message: 'Hello from Lambda!',
+      timestamp: new Date().toISOString(),
+      requestId: event.requestContext?.requestId || 'local',
+      input: event
+    })
+  };
+};`,
+                filename: "index.js"
+              }
+            },
+            dependencies: [],
+          })
+
+          // Ensure the Lambda function depends on the archive
+          const lambdaResource = resources.find(r => r.type === 'aws_lambda_function' && r.name === resourceName)
+          if (lambdaResource) {
+            lambdaResource.dependencies = lambdaResource.dependencies || []
+            lambdaResource.dependencies.push(`archive_file.${resourceName}_lambda_zip`)
+          }
+        }
       }
     })
     
@@ -108,12 +213,45 @@ export class TerraformGenerator {
           },
         }
 
+      case "api_gateway":
+        return {
+          name: config.name || "api",
+          description: config.description || "REST API",
+          endpoint_configuration: config.endpoint_configuration ? {
+            types: [config.endpoint_configuration],
+          } : {
+            types: ["REGIONAL"],
+          },
+        }
+
+      case "dynamodb":
+        return {
+          name: config.table_name || `${this.sanitizeName(node.data.name as string)}-table`,
+          billing_mode: config.billing_mode || "PAY_PER_REQUEST",
+          hash_key: config.hash_key || "id",
+          ...(config.range_key && { range_key: config.range_key }),
+          ...(config.billing_mode === "PROVISIONED" && {
+            read_capacity: Number.parseInt(config.read_capacity) || 5,
+            write_capacity: Number.parseInt(config.write_capacity) || 5,
+          }),
+          ...(config.point_in_time_recovery && {
+            point_in_time_recovery: {
+              enabled: config.point_in_time_recovery,
+            },
+          }),
+          ...(config.stream_enabled && {
+            stream_enabled: config.stream_enabled,
+            stream_view_type: "NEW_AND_OLD_IMAGES",
+          }),
+          tags: {
+            Name: config.name || node.data.name,
+            Environment: "terraform-generated",
+          },
+        }
+
       case "s3":
         return {
           bucket: config.bucket_name || `${this.sanitizeName(node.data.name as string)}-bucket-${Date.now()}`,
-          versioning: {
-            enabled: config.versioning === "Enabled",
-          },
           tags: {
             Name: config.name || node.data.name,
             Environment: "terraform-generated",
@@ -140,14 +278,22 @@ export class TerraformGenerator {
         }
 
       case "lambda":
+        const resourceName = this.sanitizeName((node.data.name as string) || (node.data.id as string))
+        const useInlineCode = !config.s3_bucket && !config.s3_key
+
         return {
-          function_name: config.function_name || `${this.sanitizeName(node.data.name as string)}-function`,
+          function_name: config.function_name || `${resourceName}-function`,
           runtime: config.runtime || "nodejs18.x",
           handler: "index.handler",
-          filename: "lambda_function.zip",
+          ...(useInlineCode ? {
+            filename: `lambda-${resourceName}.zip`,
+          } : {
+            s3_bucket: config.s3_bucket || `var.lambda_s3_bucket`,
+            s3_key: config.s3_key || `var.lambda_s3_key`,
+          }),
           memory_size: Number.parseInt(config.memory_size) || 128,
           timeout: Number.parseInt(config.timeout) || 30,
-          role: "aws_iam_role.lambda_role.arn",
+          role: `aws_iam_role.${resourceName}_role.arn`,
           tags: {
             Name: config.name || node.data.name,
             Environment: "terraform-generated",
@@ -316,6 +462,21 @@ export class TerraformGenerator {
       }
     }
 
+    // Add Lambda S3 variables if there are Lambda nodes
+    const hasLambda = this.nodes.some(node => node.data.id === 'lambda')
+    if (this.provider === "aws" && hasLambda) {
+      variables.lambda_s3_bucket = {
+        description: "S3 bucket containing the Lambda function code",
+        type: "string",
+        default: "my-lambda-bucket",
+      }
+      variables.lambda_s3_key = {
+        description: "S3 key (path) to the Lambda function ZIP file",
+        type: "string",
+        default: "lambda-function.zip",
+      }
+    }
+
     return variables
   }
 
@@ -336,12 +497,40 @@ export class TerraformGenerator {
           }
           break
 
+        case "api_gateway":
+        case "gateway":
+          outputs[`${resourceName}_id`] = {
+            description: `ID of ${node.data.name as string} API Gateway`,
+            value: `${resourceType}.${resourceName}.id`,
+          }
+          outputs[`${resourceName}_arn`] = {
+            description: `ARN of ${node.data.name as string} API Gateway`,
+            value: `${resourceType}.${resourceName}.arn`,
+          }
+          outputs[`${resourceName}_execution_arn`] = {
+            description: `Execution ARN of ${node.data.name as string} API Gateway`,
+            value: `${resourceType}.${resourceName}.execution_arn`,
+          }
+          break
+
         case "s3":
         case "storage":
         case "blob":
           outputs[`${resourceName}_bucket_name`] = {
             description: `Name of ${node.data.name as string} bucket`,
             value: `${resourceType}.${resourceName}.bucket`,
+          }
+          break
+
+        case "dynamodb":
+        case "database":
+          outputs[`${resourceName}_table_name`] = {
+            description: `Name of ${node.data.name as string} DynamoDB table`,
+            value: `${resourceType}.${resourceName}.name`,
+          }
+          outputs[`${resourceName}_table_arn`] = {
+            description: `ARN of ${node.data.name as string} DynamoDB table`,
+            value: `${resourceType}.${resourceName}.arn`,
           }
           break
 
@@ -358,6 +547,25 @@ export class TerraformGenerator {
           outputs[`${resourceName}_dns_name`] = {
             description: `DNS name of ${node.data.name as string}`,
             value: `${resourceType}.${resourceName}.dns_name`,
+          }
+          break
+
+        case "lambda":
+          outputs[`${resourceName}_function_name`] = {
+            description: `Name of ${node.data.name as string} Lambda function`,
+            value: `${resourceType}.${resourceName}.function_name`,
+          }
+          outputs[`${resourceName}_arn`] = {
+            description: `ARN of ${node.data.name as string} Lambda function`,
+            value: `${resourceType}.${resourceName}.arn`,
+          }
+          outputs[`${resourceName}_s3_bucket`] = {
+            description: `S3 bucket containing ${node.data.name as string} Lambda code`,
+            value: `${resourceType}.${resourceName}.s3_bucket`,
+          }
+          outputs[`${resourceName}_s3_key`] = {
+            description: `S3 key for ${node.data.name as string} Lambda code`,
+            value: `${resourceType}.${resourceName}.s3_key`,
           }
           break
       }
@@ -480,6 +688,10 @@ export class TerraformGenerator {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -539,26 +751,42 @@ resource "azurerm_resource_group" "main" {
       }
 
       if (typeof value === "string") {
-        if (
-          value.startsWith("var.") ||
-          value.startsWith("aws_") ||
-          value.startsWith("google_") ||
-          value.startsWith("azurerm_")
-        ) {
-          result += `${spaces}${key} = ${value}\n`
+        if (value.includes('\n')) {
+          // Use heredoc for multi-line strings
+          result += `${spaces}${key} = <<EOT\n${value}\nEOT\n`
         } else {
-          result += `${spaces}${key} = "${value}"\n`
+          // Escape inner double quotes for single-line
+          let formattedValue = value.replace(/"/g, '\\"')
+          if (value.startsWith("var.") ||
+              value.startsWith("aws_") ||
+              value.startsWith("google_") ||
+              value.startsWith("azurerm_")) {
+            result += `${spaces}${key} = ${formattedValue}\n`
+          } else {
+            result += `${spaces}${key} = "${formattedValue}"\n`
+          }
         }
       } else if (typeof value === "number" || typeof value === "boolean") {
         result += `${spaces}${key} = ${value}\n`
       } else if (Array.isArray(value)) {
-        result += `${spaces}${key} = [${value.map((v) => (typeof v === "string" ? `"${v}"` : v)).join(", ")}]\n`
+        result += `${spaces}${key} = [\n`
+        value.forEach((v, i) => {
+          if (typeof v === 'object' && v !== null) {
+            result += `${spaces}  {\n`
+            result += this.formatResourceConfig(v, indent + 2)
+            result += `${spaces}  }${i < value.length - 1 ? ',' : ''}\n`
+          } else {
+            const formatted = typeof v === "string" ? `"${v}"` : v
+            result += `${spaces}  ${formatted}${i < value.length - 1 ? ',' : ''}\n`
+          }
+        })
+        result += `${spaces}]\n`
       } else if (typeof value === "object") {
         // Special handling for different types of objects
         if (key === "tags" || parentKey === "tags") {
           // Tags should always be arguments
           result += `${spaces}${key} = {\n`
-        } else if (key === "versioning" || key === "lifecycle" || key === "provisioner") {
+        } else if (key === "versioning" || key === "lifecycle" || key === "provisioner" || key === "point_in_time_recovery") {
           // These should be blocks
           result += `${spaces}${key} {\n`
         } else {

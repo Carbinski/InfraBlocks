@@ -1,0 +1,21 @@
+{
+  "id": "internet_gateway",
+  "name": "Internet Gateway",
+  "icon": "🌍",
+  "category": "Network",
+  "description": "Internet gateway for VPC",
+  "terraformType": "aws_internet_gateway",
+  "defaultConfig": {
+    "tags": {
+      "Name": "main-igw"
+    }
+  },
+  "configSchema": {
+    "tags": {
+      "type": "string",
+      "label": "Tags",
+      "description": "JSON string of tags to apply",
+      "required": false
+    }
+  }
+}

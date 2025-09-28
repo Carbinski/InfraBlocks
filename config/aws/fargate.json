@@ -1,0 +1,74 @@
+{
+  "id": "fargate",
+  "name": "Fargate",
+  "icon": "/aws/Arch_AWS-Fargate_64.svg",
+  "category": "Compute",
+  "description": "Serverless container platform",
+  "terraformType": "aws_ecs_service",
+  "defaultConfig": {
+    "name": "fargate-service",
+    "launch_type": "FARGATE",
+    "desired_count": 1,
+    "cpu": 256,
+    "memory": 512
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "Service Name",
+      "description": "The name of the ECS service",
+      "required": true
+    },
+    "launch_type": {
+      "type": "select",
+      "label": "Launch Type",
+      "description": "The launch type for the service",
+      "options": ["FARGATE", "EC2"],
+      "default": "FARGATE",
+      "required": true
+    },
+    "desired_count": {
+      "type": "number",
+      "label": "Desired Count",
+      "description": "The desired number of tasks",
+      "default": 1,
+      "required": true,
+      "validation": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    "cpu": {
+      "type": "number",
+      "label": "CPU Units",
+      "description": "CPU units for the task",
+      "default": 256,
+      "validation": {
+        "min": 256,
+        "max": 4096
+      }
+    },
+    "memory": {
+      "type": "number",
+      "label": "Memory (MB)",
+      "description": "Memory for the task in MB",
+      "default": 512,
+      "validation": {
+        "min": 512,
+        "max": 30720
+      }
+    },
+    "task_definition_arn": {
+      "type": "string",
+      "label": "Task Definition ARN",
+      "description": "ARN of the task definition to use",
+      "required": true
+    },
+    "cluster_arn": {
+      "type": "string",
+      "label": "Cluster ARN",
+      "description": "ARN of the ECS cluster",
+      "required": true
+    }
+  }
+}

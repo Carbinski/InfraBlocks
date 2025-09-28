@@ -1,4 +1,16 @@
-import { ConfigField } from '@/components/service-definitions'
+export interface ConfigField {
+  type: 'string' | 'number' | 'boolean' | 'select' | 'multiselect'
+  label: string
+  description?: string
+  options?: string[]
+  default?: any
+  required?: boolean
+  validation?: {
+    min?: number
+    max?: number
+    pattern?: string
+  }
+}
 
 export interface ServiceConfig {
   id: string
@@ -9,6 +21,28 @@ export interface ServiceConfig {
   terraformType: string
   defaultConfig: Record<string, any>
   configSchema: Record<string, ConfigField>
+}
+
+// Static configuration for available providers and services
+const AVAILABLE_PROVIDERS = ['aws', 'azure', 'gcp'] as const
+
+const PROVIDER_SERVICES: Record<string, string[]> = {
+  aws: [
+    'api_gateway',
+    'cloudwatch', 
+    'cognito',
+    'dynamodb',
+    'ec2',
+    'fargate',
+    'lambda',
+    'rds',
+    's3',
+    'secrets_manager',
+    'step_functions',
+    'vpc'
+  ],
+  azure: ['vm'],
+  gcp: ['compute']
 }
 
 export class ConfigLoader {
@@ -32,25 +66,22 @@ export class ConfigLoader {
   }
 
   static async loadAllConfigs(): Promise<Record<string, Record<string, ServiceConfig>>> {
-    const providers = ['aws', 'gcp', 'azure']
     const result: Record<string, Record<string, ServiceConfig>> = {}
-
-    for (const provider of providers) {
-      result[provider] = {}
-      
-      // Define known services for each provider
-      const services: Record<string, string[]> = {
-        aws: ['ec2', 's3', 'rds', 'lambda', 'dynamodb', 'vpc'],
-        gcp: ['compute'],
-        azure: ['vm']
-      }
-
-      for (const serviceId of services[provider] || []) {
-        const config = await this.loadServiceConfig(provider, serviceId)
-        if (config) {
-          result[provider][serviceId] = config
+    
+    try {
+      for (const provider of AVAILABLE_PROVIDERS) {
+        result[provider] = {}
+        const services = PROVIDER_SERVICES[provider] || []
+        
+        for (const serviceId of services) {
+          const config = await this.loadServiceConfig(provider, serviceId)
+          if (config) {
+            result[provider][serviceId] = config
+          }
         }
       }
+    } catch (error) {
+      console.error('Failed to load all configs:', error)
     }
 
     return result
@@ -59,5 +90,27 @@ export class ConfigLoader {
   static getServiceConfig(provider: string, serviceId: string): ServiceConfig | null {
     const key = `${provider}/${serviceId}`
     return this.configs.get(key) || null
+  }
+
+  static async getAvailableProviders(): Promise<string[]> {
+    return [...AVAILABLE_PROVIDERS]
+  }
+
+  static async findServiceById(serviceId: string): Promise<ServiceConfig | null> {
+    for (const provider of AVAILABLE_PROVIDERS) {
+      const services = PROVIDER_SERVICES[provider] || []
+      if (services.includes(serviceId)) {
+        const config = await this.loadServiceConfig(provider, serviceId)
+        if (config) {
+          return config
+        }
+      }
+    }
+    
+    return null
+  }
+
+  static clearCache(): void {
+    this.configs.clear()
   }
 }

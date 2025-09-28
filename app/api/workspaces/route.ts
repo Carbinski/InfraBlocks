@@ -98,7 +98,7 @@ async function generateTerraformFiles(
   edges: Edge[]
 ): Promise<GeneratedFiles> {
   const generator = new TerraformGenerator(workspace.provider, nodes, edges)
-  const output = generator.generate()
+  const output = await generator.generate()
 
   // Generate main.tf with only resources (no variables, outputs, or provider config)
   const mainTf = generateMainTfOnly(output.resources)
@@ -161,7 +161,17 @@ function generateMainTfOnly(resources: any[]): string {
       } else if (typeof value === 'number' || typeof value === 'boolean') {
         content += `  ${key} = ${value}\n`
       } else if (Array.isArray(value)) {
-        content += `  ${key} = [${value.map(v => typeof v === 'string' ? `"${v}"` : v).join(', ')}]\n`
+        content += `  ${key} = [${value.map(v => {
+          if (typeof v === 'string') {
+            // Check if it's a Terraform reference (like aws_security_group.default.id)
+            if (v.startsWith('var.') || v.startsWith('aws_') || v.startsWith('google_') || v.startsWith('azurerm_')) {
+              return v
+            } else {
+              return `"${v}"`
+            }
+          }
+          return v
+        }).join(', ')}]\n`
       } else if (typeof value === 'object') {
         // Special handling for different types of objects
         if (key === 'tags') {
@@ -179,7 +189,7 @@ function generateMainTfOnly(resources: any[]): string {
     })
     
     if (resource.dependencies && resource.dependencies.length > 0) {
-      content += `  depends_on = [${resource.dependencies.map((dep: string) => `${dep}`).join(', ')}]\n`
+      content += `  depends_on = [${resource.dependencies.map((dep: string) => dep).join(', ')}]\n`
     }
     
     content += '}\n\n'
@@ -408,6 +418,9 @@ async function generateAdditionalFiles(
  */
 function generateAWSSecurityGroups(nodes: Node[]): string {
   const hasEC2 = nodes.some(node => node.data.id === 'ec2')
+  const hasExistingVPC = nodes.some(node => node.data.id === 'vpc')
+
+  // Generate security groups when we have EC2 instances that need network access
   if (!hasEC2) return ''
 
   return `# Security Groups
@@ -454,8 +467,9 @@ resource "aws_security_group" "default" {
  * Generate AWS VPC configuration
  */
 function generateAWSVPCConfig(nodes: Node[]): string {
-  const hasVPC = nodes.some(node => node.data.id === 'vpc')
-  if (!hasVPC) return ''
+  const hasEC2 = nodes.some(node => node.data.id === 'ec2')
+  // Generate VPC config when we have EC2 instances that need network infrastructure
+  if (!hasEC2) return ''
 
   return `# VPC Configuration
 resource "aws_vpc" "main" {

@@ -1,10 +1,11 @@
 import { spawn } from 'child_process'
 import { NextRequest, NextResponse } from 'next/server'
+import { CredentialManager } from '@/lib/credential-manager'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { workingDirectory, planFile, autoApprove } = body
+    const { workingDirectory, planFile, autoApprove, credentials } = body
     
     console.log('🚀 Terraform Apply API called:', {
       workingDirectory,
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🚀 Executing terraform apply command with args:', args)
-    const result = await executeTerraformCommand('apply', args, workingDirectory)
+    const result = await executeTerraformCommand('apply', args, workingDirectory, credentials)
     
     console.log('📊 Terraform apply result:', {
       success: result.success,
@@ -64,7 +65,8 @@ export async function POST(request: NextRequest) {
 function executeTerraformCommand(
   command: string,
   args: string[],
-  workingDirectory: string
+  workingDirectory: string,
+  credentials?: any
 ): Promise<{ success: boolean; output: string; error?: string; exitCode: number }> {
   return new Promise((resolve) => {
     const fullCommand = `terraform ${command} ${args.join(' ')}`
@@ -73,10 +75,19 @@ function executeTerraformCommand(
       workingDirectory,
       timestamp: new Date().toISOString()
     })
-    
+
+    // Prepare environment variables with AWS credentials
+    const env = { ...process.env }
+    if (credentials?.aws) {
+      env.AWS_ACCESS_KEY_ID = credentials.aws.accessKeyId
+      env.AWS_SECRET_ACCESS_KEY = credentials.aws.secretAccessKey
+      env.AWS_DEFAULT_REGION = credentials.aws.region
+    }
+
     const terraform = spawn('terraform', [command, ...args], {
       cwd: workingDirectory,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env
     })
 
     let output = ''

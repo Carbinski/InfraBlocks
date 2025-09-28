@@ -9,6 +9,7 @@ import {
   SelectValue
 } from "@/components/ui/select"
 import { deployInfrastructure, getDeploymentStatus } from "@/lib/api-service"
+import { ConfigLoader } from "@/lib/config-loader"
 import { CredentialManager } from "@/lib/credential-manager"
 import { InfrastructureCanvasProps } from "@/types"
 import type { DeploymentStatus } from "@/types/deployment"
@@ -43,7 +44,6 @@ import { CloudServiceNode } from "./cloud-service-node"
 import { ConfigurationPanel } from "./configuration-panel"
 import { getConnectionSuggestions, validateConnection } from "./connection-validator"
 import { DeploymentStatusPanel } from "./deployment-status-panel"
-import { serviceDefinitions } from "./service-definitions"
 import { TerraformGenerator } from "./terraform-generator"
 import { AIReviewDialog } from "./ai-review-dialog"
 
@@ -127,9 +127,31 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     },
   }
 
+  const [services, setServices] = useState<any[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [servicesLoaded, setServicesLoaded] = useState(false)
+
   const config = providerConfig[provider as keyof typeof providerConfig]
-  const services = Object.values(serviceDefinitions[provider] || {})
-  const categories = [...new Set(services.map((s) => s.category))]
+
+  // Load services from config files
+  useEffect(() => {
+    const loadServices = async () => {
+      try {
+        const serviceConfigs = await ConfigLoader.loadAllConfigs()
+        const providerServices = Object.values(serviceConfigs[provider] || {})
+        setServices(providerServices)
+        setCategories([...new Set(providerServices.map((s) => s.category))])
+        setServicesLoaded(true)
+      } catch (error) {
+        console.error('Failed to load services:', error)
+        setServices([])
+        setCategories([])
+        setServicesLoaded(true)
+      }
+    }
+
+    loadServices()
+  }, [provider])
 
   const onConnect: OnConnect = useCallback(
     (params: Connection | Edge) => {
@@ -183,7 +205,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     (event: DragEvent) => {
       event.preventDefault()
 
-      if (!reactFlowWrapper.current || !reactFlowInstance) return
+      if (!reactFlowInstance) return
 
       const serviceData = event.dataTransfer.getData("application/reactflow")
 
@@ -191,14 +213,11 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
 
       const service = JSON.parse(serviceData)
       
-      // Get the mouse position relative to the ReactFlow wrapper
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect()
-      const mouseX = event.clientX - reactFlowBounds.left
-      const mouseY = event.clientY - reactFlowBounds.top
-      
+      // Use the ReactFlow instance's screenToFlowPosition method directly
+      // This method handles all the internal transforms, zoom, and pan calculations
       const position = reactFlowInstance.screenToFlowPosition({
-        x: mouseX,
-        y: mouseY,
+        x: event.clientX,
+        y: event.clientY,
       })
 
       const newNode: Node = {
@@ -343,7 +362,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   }
 
   // Generate Terraform code from nodes
-  const generateTerraformCode = () => {
+  const generateTerraformCode = async () => {
     if (nodes.length === 0) {
       return `# No resources defined yet
 # Drag and drop services from the sidebar to generate Terraform code`
@@ -351,7 +370,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
 
     try {
       const terraformGenerator = new TerraformGenerator(provider, nodes, edges)
-      return terraformGenerator.generateTerraformCode()
+      return await terraformGenerator.generateTerraformCode()
     } catch (error) {
       console.error('Error generating Terraform code:', error)
       return `# Error generating Terraform code: ${error}`
@@ -378,19 +397,19 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
 
   }
 
-  // Initialize Terraform files with default content
-  const initializeTerraformFiles = () => {
-    const mainTf = generateTerraformCode()
+  // Helper function to generate Terraform files
+  const generateTerraformFiles = async () => {
+    const mainTf = await generateTerraformCode()
     
     // Generate separate files using TerraformGenerator
-    let variablesTf = ""
-    let outputsTf = ""
-    let providersTf = ""
+    let variablesTf: string = ""
+    let outputsTf: string = ""
+    let providersTf: string = ""
     
     if (nodes.length > 0) {
       try {
         const terraformGenerator = new TerraformGenerator(provider, nodes, edges)
-        const output = terraformGenerator.generate()
+        const output = await terraformGenerator.generate()
         
         // Generate variables.tf
         if (Object.keys(output.variables).length > 0) {
@@ -426,28 +445,14 @@ variable "environment" {
 `
         }
         
-        // Generate outputs.tf
-        if (Object.keys(output.outputs).length > 0) {
-          outputsTf = "# Outputs\n"
-          Object.entries(output.outputs).forEach(([name, config]) => {
-            outputsTf += `output "${name}" {\n`
-            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
-              if (typeof value === "string") {
-                outputsTf += `  ${key} = "${value}"\n`
-              } else {
-                outputsTf += `  ${key} = ${value}\n`
-              }
-            })
-            outputsTf += "}\n\n"
-          })
-        } else {
-          outputsTf = `# Outputs for your infrastructure
+        // Generate outputs.tf using the dedicated method
+        const generatedOutputsTf = await terraformGenerator.generateOutputsFile()
+        outputsTf = generatedOutputsTf.trim() ? generatedOutputsTf : `# Outputs for your infrastructure
 output "resources_created" {
   description = "Number of resources created"
   value       = ${nodes.length}
 }
 `
-        }
         
         // Generate providers.tf
         providersTf = terraformGenerator.generateProviderBlock()
@@ -622,178 +627,29 @@ provider "aws" {
   }
 
   // Update all Terraform files when nodes change
-  const updateAllTerraformFiles = () => {
-    const mainTf = generateTerraformCode()
-    
-    // Generate separate files using TerraformGenerator
-    let variablesTf = ""
-    let outputsTf = ""
-    let providersTf = ""
-    
-    if (nodes.length > 0) {
-      try {
-        const terraformGenerator = new TerraformGenerator(provider, nodes, edges)
-        const output = terraformGenerator.generate()
-        
-        // Generate variables.tf
-        if (Object.keys(output.variables).length > 0) {
-          variablesTf = "# Variables\n"
-          Object.entries(output.variables).forEach(([name, config]) => {
-            variablesTf += `variable "${name}" {\n`
-            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
-              if (key === "type" && value === "string") {
-                variablesTf += `  ${key} = ${value}\n`
-              } else if (typeof value === "string") {
-                variablesTf += `  ${key} = "${value}"\n`
-              } else if (typeof value === "boolean") {
-                variablesTf += `  ${key} = ${value}\n`
-              } else {
-                variablesTf += `  ${key} = ${JSON.stringify(value)}\n`
-              }
-            })
-            variablesTf += "}\n\n"
-          })
-        } else {
-          variablesTf = `# Variables for your infrastructure
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-west-2"
-}
-
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "dev"
-}
-`
-        }
-        
-        // Generate outputs.tf
-        if (Object.keys(output.outputs).length > 0) {
-          outputsTf = "# Outputs\n"
-          Object.entries(output.outputs).forEach(([name, config]) => {
-            outputsTf += `output "${name}" {\n`
-            Object.entries(config as Record<string, any>).forEach(([key, value]) => {
-              if (typeof value === "string") {
-                outputsTf += `  ${key} = "${value}"\n`
-              } else {
-                outputsTf += `  ${key} = ${value}\n`
-              }
-            })
-            outputsTf += "}\n\n"
-          })
-        } else {
-          outputsTf = `# Outputs for your infrastructure
-output "resources_created" {
-  description = "Number of resources created"
-  value       = ${nodes.length}
-}
-`
-        }
-        
-        // Generate providers.tf
-        providersTf = terraformGenerator.generateProviderBlock()
-        
-      } catch (error) {
-        console.error('Error generating Terraform files:', error)
-        // Fallback to default content
-        variablesTf = `# Variables for your infrastructure
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-west-2"
-}
-
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "dev"
-}
-`
-
-        outputsTf = `# Outputs for your infrastructure
-output "resources_created" {
-  description = "Number of resources created"
-  value       = ${nodes.length}
-}
-`
-
-        providersTf = `# Provider configuration
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.region
-}
-`
-      }
-    } else {
-      // Default content when no nodes
-      variablesTf = `# Variables for your infrastructure
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-west-2"
-}
-
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "dev"
-}
-`
-
-      outputsTf = `# Outputs for your infrastructure
-output "resources_created" {
-  description = "Number of resources created"
-  value       = ${nodes.length}
-}
-`
-
-      providersTf = `# Provider configuration
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.region
-}
-`
-    }
-
-    setTerraformFiles({
-      "main.tf": mainTf,
-      "variables.tf": variablesTf,
-      "outputs.tf": outputsTf,
-      "providers.tf": providersTf
-    })
+  const updateAllTerraformFiles = async () => {
+    await generateTerraformFiles()
   }
 
   // Update main.tf when nodes change (kept for backward compatibility)
-  const updateMainTf = () => {
-    updateAllTerraformFiles()
+  const updateMainTf = async () => {
+    await updateAllTerraformFiles()
   }
 
   // Initialize files on component mount
   useEffect(() => {
-    initializeTerraformFiles()
+    const initFiles = async () => {
+      await generateTerraformFiles()
+    }
+    initFiles()
   }, [])
 
   // Update main.tf when nodes change
   useEffect(() => {
-    updateMainTf()
+    const updateFiles = async () => {
+      await updateMainTf()
+    }
+    updateFiles()
   }, [nodes])
 
   // Handle keyboard events for delete functionality
@@ -862,23 +718,34 @@ provider "aws" {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {services.slice(0, 12).map((service) => (
-                  <div
-                    key={service.id}
-                    className="flex flex-col items-center p-2 hover:bg-purple-50 rounded cursor-grab active:cursor-grabbing border border-gray-200 hover:border-purple-200 transition-colors"
-                    draggable
-                    onDragStart={(event) => onDragStart(event, service)}
-                  >
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm mb-1">
-                      {service.icon.startsWith('/') ? (
-                        <img src={service.icon} alt={service.name} className="w-6 h-6" />
-                      ) : (
-                        <span className="text-lg">{service.icon}</span>
-                      )}
-                    </div>
-                    <span className="text-xs text-gray-700 text-center leading-tight">{service.name}</span>
+                {!servicesLoaded ? (
+                  <div className="col-span-3 flex items-center justify-center p-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                    <span className="ml-2 text-sm text-gray-600">Loading services...</span>
                   </div>
-                ))}
+                ) : services.length === 0 ? (
+                  <div className="col-span-3 flex items-center justify-center p-4">
+                    <span className="text-sm text-gray-600">No services available</span>
+                  </div>
+                ) : (
+                  services.slice(0, 12).map((service) => (
+                    <div
+                      key={service.id}
+                      className="flex flex-col items-center p-2 hover:bg-purple-50 rounded cursor-grab active:cursor-grabbing border border-gray-200 hover:border-purple-200 transition-colors"
+                      draggable
+                      onDragStart={(event) => onDragStart(event, service)}
+                    >
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm mb-1">
+                        {service.icon.startsWith('/') ? (
+                          <img src={service.icon} alt={service.name} className="w-6 h-6" />
+                        ) : (
+                          <span className="text-lg">{service.icon}</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-700 text-center leading-tight">{service.name}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -924,7 +791,7 @@ provider "aws" {
 
           {/* Canvas Area */}
           <div className="flex-1 relative bg-gray-50">
-            <div ref={reactFlowWrapper} className="h-full">
+            <div className="h-full">
               <ReactFlowProvider>
                 <ReactFlow
                   nodes={nodes}
