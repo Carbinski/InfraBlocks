@@ -146,6 +146,26 @@ function generateMainTfOnly(resources: any[]): string {
   resources.forEach((resource) => {
     content += `resource "${resource.type}" "${resource.name}" {\n`
     
+    // Special handling for DynamoDB tables - add attribute blocks for keys
+    if (resource.type === 'aws_dynamodb_table') {
+      const hashKey = resource.config.hash_key
+      const rangeKey = resource.config.range_key
+      
+      if (hashKey) {
+        content += `  attribute {\n`
+        content += `    name = "${hashKey}"\n`
+        content += `    type = "S"\n`
+        content += `  }\n`
+      }
+      
+      if (rangeKey) {
+        content += `  attribute {\n`
+        content += `    name = "${rangeKey}"\n`
+        content += `    type = "S"\n`
+        content += `  }\n`
+      }
+    }
+    
     // Format resource configuration
     Object.entries(resource.config).forEach(([key, value]) => {
       if (value === null || value === undefined) {
