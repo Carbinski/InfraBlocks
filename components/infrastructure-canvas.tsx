@@ -132,6 +132,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [deploymentError, setDeploymentError] = useState<string | null>(null)
   // Local fake progress to give the user visual feedback while deployment is running
   const [fakeProgress, setFakeProgress] = useState<number>(0)
+  const [isProgressVisible, setIsProgressVisible] = useState<boolean>(true)
   const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
   const [isAIReviewOpen, setIsAIReviewOpen] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
@@ -615,9 +616,12 @@ provider "aws" {
       return
     }
 
-    setIsDeploying(true)
-    setDeploymentError(null)
-    setDeploymentStatus(null)
+  // Reset progress UI when starting a new deployment
+  setFakeProgress(0)
+  setIsProgressVisible(true)
+  setDeploymentError(null)
+  setDeploymentStatus(null)
+  setIsDeploying(true)
 
     try {
       const deploymentRequest = {
@@ -701,8 +705,19 @@ provider "aws" {
 
   // Sync fakeProgress to real deployment progress when available
   useEffect(() => {
-    if (deploymentStatus && typeof deploymentStatus.progress === 'number') {
+    if (!deploymentStatus) return
+
+    if (typeof deploymentStatus.progress === 'number') {
       setFakeProgress(deploymentStatus.progress)
+    }
+
+    // When deployment finishes, clear the progress and hide the bar after a short delay
+    if (deploymentStatus.status === 'completed' || deploymentStatus.status === 'failed' || deploymentStatus.status === 'cancelled') {
+      const t = window.setTimeout(() => {
+        setFakeProgress(0)
+        setIsProgressVisible(false)
+      }, 800)
+      return () => clearTimeout(t)
     }
   }, [deploymentStatus])
 
@@ -1001,8 +1016,17 @@ provider "aws" {
                 {(isDeploying || deploymentStatus || deploymentError || fakeProgress > 0) && (
                   <div className="mb-4">
                     {/* Progress bar (fake/approximate) placed above the status box */}
-                    {(isDeploying || fakeProgress > 0) && (
-                      <div className="mb-2">
+                    {(isProgressVisible && (isDeploying || fakeProgress > 0)) && (
+                      <div className="mb-2 relative">
+                        <div className="absolute top-0 right-0">
+                          <button
+                            className="text-xs text-gray-500 hover:text-gray-700 p-1"
+                            onClick={() => setIsProgressVisible(false)}
+                            aria-label="Close progress"
+                          >
+                            ×
+                          </button>
+                        </div>
                         <div className="text-xs text-gray-600 mb-1">Deployment progress</div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
