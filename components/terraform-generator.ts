@@ -55,19 +55,39 @@ export class TerraformGenerator {
 
       // Add additional resources for specific services
       if (node.data.id === 's3') {
+        const resourceName = this.sanitizeName((node.data.name as string) || (node.data.id as string))
+        const terraformType = node.data.terraformType as string
+        const bucketReference = `${terraformType}.${resourceName}`
+
         // Add public access block for S3 buckets
         resources.push({
           type: 'aws_s3_bucket_public_access_block',
-          name: this.sanitizeName((node.data.name as string) || (node.data.id as string)),
+          name: resourceName,
           config: {
-            bucket: `${node.data.terraformType as string}.${this.sanitizeName((node.data.name as string) || (node.data.id as string))}.id`,
+            bucket: `${bucketReference}.id`,
             block_public_acls: true,
             block_public_policy: true,
             ignore_public_acls: true,
             restrict_public_buckets: true,
           },
-          dependencies: [`${node.data.terraformType as string}.${this.sanitizeName((node.data.name as string) || (node.data.id as string))}`],
+          dependencies: [bucketReference],
         })
+
+        // Add versioning resource for S3 buckets
+        const versioningEnabled = (node.data.config as any)?.versioning === "Enabled"
+        if (versioningEnabled !== undefined) {
+          resources.push({
+            type: 'aws_s3_bucket_versioning',
+            name: `${resourceName}_versioning`,
+            config: {
+              bucket: `${bucketReference}.id`,
+              versioning_configuration: {
+                status: versioningEnabled ? "Enabled" : "Disabled",
+              },
+            },
+            dependencies: [bucketReference],
+          })
+        }
       }
 
       if (node.data.id === 'lambda') {
@@ -110,7 +130,8 @@ export class TerraformGenerator {
         })
 
         // Create default Lambda function ZIP file if using inline code
-        const useInlineCode = !node.data.config?.s3_bucket && !node.data.config?.s3_key
+        const config = node.data.config as any
+        const useInlineCode = !config?.s3_bucket && !config?.s3_key
         if (useInlineCode) {
           // Create a simple archive resource for the Lambda function
           resources.push({
@@ -195,9 +216,6 @@ export class TerraformGenerator {
       case "s3":
         return {
           bucket: config.bucket_name || `${this.sanitizeName(node.data.name as string)}-bucket-${Date.now()}`,
-          versioning: {
-            enabled: config.versioning === "Enabled",
-          },
           tags: {
             Name: config.name || node.data.name,
             Environment: "terraform-generated",
