@@ -42,6 +42,8 @@ import { ConfigurationPanel } from "./configuration-panel"
 import { getConnectionSuggestions, validateConnection } from "./connection-validator"
 import { DeploymentStatusPanel } from "./deployment-status-panel"
 import { TerraformGenerator } from "./terraform-generator"
+import { UndoRedoControls } from "./undo-redo-controls"
+import { useCanvasHistory } from "@/hooks/use-canvas-history"
 
 
 const createNodeTypes = (onNodeDoubleClick: (nodeData: any) => void) => ({
@@ -69,6 +71,27 @@ const getId = () => `node_${nodeId++}`
 export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([])
+  
+  // Initialize undo/redo functionality
+  const { canUndo, canRedo, undo, redo, saveState, getCurrentState, historyLength, currentIndex } = useCanvasHistory()
+  
+  // Track if we're syncing from history to prevent conflicts
+  const isSyncingFromHistory = useRef(false)
+
+  // Sync state with history when undo/redo is performed
+  useEffect(() => {
+    const currentState = getCurrentState()
+    if (currentState && !isSyncingFromHistory.current) {
+      console.log('Syncing state from history:', currentState)
+      isSyncingFromHistory.current = true
+      setNodes(currentState.nodes)
+      setEdges(currentState.edges)
+      // Reset the flag after state is synced
+      setTimeout(() => {
+        isSyncingFromHistory.current = false
+      }, 100)
+    }
+  }, [currentIndex]) // Only depend on currentIndex, not the function
 
   // Debug: Log edges changes
   useEffect(() => {
@@ -84,6 +107,7 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     console.log('Nodes updated:', nodes)
     console.log('Nodes length:', nodes.length)
   }, [nodes])
+
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedNode, setSelectedNode] = useState<any>(null)
@@ -179,13 +203,17 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
       
       console.log('Creating new edge:', newEdge)
       
-      setEdges((eds) => {
-        const updatedEdges = addEdge(newEdge, eds)
-        console.log('Updated edges:', updatedEdges)
-        return updatedEdges
-      })
+      // Calculate the new state before applying it
+      const updatedEdges = addEdge(newEdge, edges)
+      
+      // Save state with the complete new state
+      if (!isSyncingFromHistory.current) {
+        saveState(nodes, updatedEdges, 'connect')
+      }
+      
+      setEdges(updatedEdges)
     },
-    [nodes, setEdges, provider],
+    [nodes, edges, provider, saveState],
   )
 
   const onDragOver = useCallback((event: DragEvent) => {
@@ -224,9 +252,17 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
         },
       }
 
-      setNodes((nds) => nds.concat(newNode))
+      // Calculate the new state before applying it
+      const updatedNodes = nodes.concat(newNode)
+      
+      // Save state with the complete new state
+      if (!isSyncingFromHistory.current) {
+        saveState(updatedNodes, edges, 'add_node')
+      }
+      
+      setNodes(updatedNodes)
     },
-    [reactFlowInstance, setNodes, provider],
+    [reactFlowInstance, nodes, edges, provider, saveState],
   )
 
   const onDragStart = (event: DragEvent, service: any) => {
@@ -240,16 +276,35 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   }
 
   const deleteSelectedElements = useCallback(() => {
+    let updatedNodes = nodes
+    let updatedEdges = edges
+    let hasChanges = false
+    
     if (selectedNodes.length > 0) {
-      setNodes((nds) => nds.filter((node) => !selectedNodes.includes(node.id)))
+      updatedNodes = nodes.filter((node) => !selectedNodes.includes(node.id))
+      hasChanges = true
       setSelectedNodes([])
     }
     
     if (selectedEdges.length > 0) {
-      setEdges((eds) => eds.filter((edge) => !selectedEdges.includes(edge.id)))
+      updatedEdges = edges.filter((edge) => !selectedEdges.includes(edge.id))
+      hasChanges = true
       setSelectedEdges([])
     }
-  }, [selectedNodes, selectedEdges])
+    
+    // Save state with complete updated state if there were changes
+    if (hasChanges && !isSyncingFromHistory.current) {
+      saveState(updatedNodes, updatedEdges, 'delete_elements')
+    }
+    
+    // Apply the changes
+    if (selectedNodes.length > 0) {
+      setNodes(updatedNodes)
+    }
+    if (selectedEdges.length > 0) {
+      setEdges(updatedEdges)
+    }
+  }, [selectedNodes, selectedEdges, nodes, edges, saveState])
 
   const handleSelectionChange = useCallback(({ nodes: selectedNodesArray, edges: selectedEdgesArray }: { nodes: any[], edges: any[] }) => {
     setSelectedNodes(selectedNodesArray.map(node => node.id))
@@ -275,13 +330,19 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
       console.log('Creating test connection:', testEdge)
       console.log('Current nodes:', nodes)
       console.log('Current edges before:', edges)
-      setEdges((eds) => {
-        const newEdges = addEdge(testEdge, eds)
-        console.log('New edges after adding:', newEdges)
-        return newEdges
-      })
+      
+      // Calculate the new state before applying it
+      const updatedEdges = addEdge(testEdge, edges)
+      
+      // Save state with the complete new state
+      if (!isSyncingFromHistory.current) {
+        saveState(nodes, updatedEdges, 'test_connect')
+      }
+      
+      setEdges(updatedEdges)
     }
   }
+
 
   const suggestions = getConnectionSuggestions(nodes, provider!)
 
@@ -612,7 +673,7 @@ provider "aws" {
     updateFiles()
   }, [nodes])
 
-  // Handle keyboard events for delete functionality
+  // Handle keyboard events for delete and undo/redo functionality
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -628,13 +689,24 @@ provider "aws" {
           deleteSelectedElements()
         }
       }
+      
+      // Undo/Redo shortcuts
+      if ((event.ctrlKey || event.metaKey) && event.key) {
+        if (event.key === 'z' && !event.shiftKey) {
+          event.preventDefault()
+          undo()
+        } else if (event.key === 'y' || (event.key === 'z' && event.shiftKey)) {
+          event.preventDefault()
+          redo()
+        }
+      }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [deleteSelectedElements])
+  }, [deleteSelectedElements, undo, redo])
 
   return (
     <div className="h-screen bg-white flex flex-col">
@@ -652,6 +724,15 @@ provider "aws" {
             <span className="text-sm font-medium text-gray-600">aws</span>
           </div>
           <div className="flex items-center gap-2">
+            <UndoRedoControls
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={undo}
+              onRedo={redo}
+              showCounts={true}
+              historyLength={historyLength}
+              currentIndex={currentIndex}
+            />
             <Button 
               variant="ghost" 
               size="sm" 
