@@ -118,6 +118,8 @@ export async function POST(request: NextRequest) {
 
 CURRENT CANVAS STATE: ${canvasContext || 'No canvas context available'}
 
+IMPORTANT: When users ask questions about services, architecture, costs, security, or performance, assume they are asking about their CURRENT infrastructure setup on the canvas unless they explicitly mention creating something new.
+
 You should be conversational, helpful, and adaptable to user needs. Respond naturally to questions and only use functions when the user clearly wants to take action (create, build, deploy infrastructure).
 
 CONVERSATION GUIDELINES:
@@ -126,6 +128,7 @@ CONVERSATION GUIDELINES:
 - Only call functions when users explicitly want to create or modify infrastructure
 - Feel free to discuss concepts, provide explanations, and have back-and-forth conversations
 - Use functions as tools to help users, not as rigid requirements
+- ALWAYS assume questions are about the current canvas infrastructure unless user says otherwise
 
 WHEN TO USE FUNCTIONS:
 - create_infrastructure: When users explicitly want to CREATE, BUILD, or ADD infrastructure to their canvas
@@ -134,6 +137,7 @@ WHEN TO USE FUNCTIONS:
 - provide_best_practices: When users ask for structured best practices guidance
 
 WHEN TO RESPOND CONVERSATIONALLY:
+- Questions about current infrastructure (assume this is the default)
 - General questions about cloud concepts
 - Explanations of how services work
 - Discussions about architecture patterns
@@ -236,6 +240,12 @@ async function handleCreateInfrastructure(args: any) {
     "web-app": "Web Application",
     "web app": "Web Application", 
     "webapp": "Web Application",
+    "web application": "Web Application",
+    "full app": "Web Application",
+    "complete app": "Web Application",
+    "entire app": "Web Application",
+    "full stack": "Web Application",
+    "full infrastructure": "Web Application",
     "single-service": "Single Service",
     "single service": "Single Service",
     "api-gateway": "API Gateway",
@@ -252,10 +262,13 @@ async function handleCreateInfrastructure(args: any) {
 
   const normalizedType = typeMapping[infrastructureType.toLowerCase() as keyof typeof typeMapping] || infrastructureType
 
-  // Check if this is a single service request
+  // Check if this is a single service request (not a full application)
   const singleServiceKeywords = ['add', 'create', 'dynamodb', 'dynamo', 's3', 'api gateway', 'sqs', 'rds', 'database', 'bucket', 'table', 'queue']
+  const fullAppKeywords = ['web app', 'webapp', 'web application', 'full app', 'complete app', 'entire app', 'full stack', 'full infrastructure']
+  
   const isSingleService = infrastructureType.toLowerCase().includes('single') || 
-                         singleServiceKeywords.some(keyword => requirements.toLowerCase().includes(keyword))
+                         (singleServiceKeywords.some(keyword => requirements.toLowerCase().includes(keyword)) && 
+                          !fullAppKeywords.some(keyword => requirements.toLowerCase().includes(keyword)))
 
   if (isSingleService) {
     console.log('⚡ Handler: Detected single service request, creating directly')
@@ -265,6 +278,24 @@ async function handleCreateInfrastructure(args: any) {
   // Detect complexity/scale from requirements
   const requirementsLower = requirements.toLowerCase()
   let detectedComplexity = "Custom Configuration"
+  
+  // Check if user wants a full web app with multiple components
+  const wantsFullWebApp = requirementsLower.includes('web app') || 
+                         requirementsLower.includes('webapp') || 
+                         requirementsLower.includes('web application') ||
+                         requirementsLower.includes('full app') ||
+                         requirementsLower.includes('complete app') ||
+                         requirementsLower.includes('entire app') ||
+                         requirementsLower.includes('full stack') ||
+                         requirementsLower.includes('full infrastructure') ||
+                         requirementsLower.includes('at least 3') ||
+                         requirementsLower.includes('multiple components') ||
+                         requirementsLower.includes('all components')
+  
+  if (wantsFullWebApp && normalizedType !== "Web Application") {
+    console.log('🎯 Handler: User wants full web app, overriding type to Web Application')
+    return handleInfrastructureDetails("Web Application", "Full web application with multiple components", requirements)
+  }
   
   if (requirementsLower.includes('basic') || requirementsLower.includes('simple') || requirementsLower.includes('minimal')) {
     detectedComplexity = "Basic Setup"
@@ -555,14 +586,14 @@ function generateInfrastructureComponents(type: string, complexity: string): any
   const components: any[] = []
 
   if (type === "Web Application") {
-    // Full web application stack
+    // Full web application stack with better positioning
     components.push(
       {
         id: "api-gateway",
         name: "API Gateway",
         provider: "aws",
         service: "api_gateway",
-        position: { x: 100, y: 100 },
+        position: { x: 200, y: 200 },
         config: {
           name: "web-api-gateway",
           description: "API Gateway for web application"
@@ -573,7 +604,7 @@ function generateInfrastructureComponents(type: string, complexity: string): any
         name: "Message Queue",
         provider: "aws",
         service: "sqs",
-        position: { x: 300, y: 100 },
+        position: { x: 400, y: 200 },
         config: {
           name: "web-app-queue",
           delay_seconds: 0,
@@ -588,7 +619,7 @@ function generateInfrastructureComponents(type: string, complexity: string): any
         name: "Storage Bucket",
         provider: "aws",
         service: "s3",
-        position: { x: 500, y: 100 },
+        position: { x: 200, y: 400 },
         config: {
           name: "web-app-storage-bucket",
           versioning: true,
@@ -600,7 +631,7 @@ function generateInfrastructureComponents(type: string, complexity: string): any
         name: "Database Table",
         provider: "aws",
         service: "dynamodb",
-        position: { x: 700, y: 100 },
+        position: { x: 400, y: 400 },
         config: {
           table_name: "web-app-data",
           hash_key: "id",
@@ -610,16 +641,21 @@ function generateInfrastructureComponents(type: string, complexity: string): any
       }
     )
   } else if (type === "Single Service") {
-    // Handle individual service requests
+    // Handle individual service requests with consistent positioning
     const lowerRequirements = complexity.toLowerCase()
+    const timestamp = Date.now()
+    
+    // Center position for single services
+    const centerX = 300
+    const centerY = 300
 
     if (lowerRequirements.includes('dynamodb') || lowerRequirements.includes('dynamo')) {
       components.push({
-        id: "dynamodb-table-" + Date.now(),
+        id: "dynamodb-table-" + timestamp,
         name: "DynamoDB Table",
         provider: "aws",
         service: "dynamodb",
-        position: { x: Math.random() * 400 + 100, y: Math.random() * 200 + 100 },
+        position: { x: centerX, y: centerY },
         config: {
           table_name: "my-table",
           hash_key: "id",
@@ -629,11 +665,11 @@ function generateInfrastructureComponents(type: string, complexity: string): any
       })
     } else if (lowerRequirements.includes('s3')) {
       components.push({
-        id: "s3-bucket-" + Date.now(),
+        id: "s3-bucket-" + timestamp,
         name: "S3 Bucket",
         provider: "aws",
         service: "s3",
-        position: { x: Math.random() * 400 + 100, y: Math.random() * 200 + 100 },
+        position: { x: centerX, y: centerY },
         config: {
           name: "my-bucket-" + Math.random().toString(36).substring(2, 8),
           versioning: true,
@@ -642,11 +678,11 @@ function generateInfrastructureComponents(type: string, complexity: string): any
       })
     } else if (lowerRequirements.includes('api gateway') || lowerRequirements.includes('api-gateway')) {
       components.push({
-        id: "api-gateway-" + Date.now(),
+        id: "api-gateway-" + timestamp,
         name: "API Gateway",
         provider: "aws",
         service: "api_gateway",
-        position: { x: Math.random() * 400 + 100, y: Math.random() * 200 + 100 },
+        position: { x: centerX, y: centerY },
         config: {
           name: "my-api-gateway",
           description: "API Gateway service"
@@ -654,11 +690,11 @@ function generateInfrastructureComponents(type: string, complexity: string): any
       })
     } else if (lowerRequirements.includes('sqs')) {
       components.push({
-        id: "sqs-queue-" + Date.now(),
+        id: "sqs-queue-" + timestamp,
         name: "SQS Queue",
         provider: "aws",
         service: "sqs",
-        position: { x: Math.random() * 400 + 100, y: Math.random() * 200 + 100 },
+        position: { x: centerX, y: centerY },
         config: {
           name: "my-queue",
           delay_seconds: 0,
@@ -670,11 +706,11 @@ function generateInfrastructureComponents(type: string, complexity: string): any
       })
     } else if (lowerRequirements.includes('rds') || lowerRequirements.includes('database')) {
       components.push({
-        id: "rds-instance-" + Date.now(),
+        id: "rds-instance-" + timestamp,
         name: "RDS Database",
         provider: "aws",
         service: "rds",
-        position: { x: Math.random() * 400 + 100, y: Math.random() * 200 + 100 },
+        position: { x: centerX, y: centerY },
         config: {
           engine: "mysql",
           engine_version: "8.0",

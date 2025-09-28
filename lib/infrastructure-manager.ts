@@ -116,73 +116,150 @@ export async function addInfrastructureToCanvas(components: InfrastructureCompon
 // Generate connections between infrastructure components
 function generateConnections(components: InfrastructureComponent[]): Edge[] {
   const edges: Edge[] = []
-  const componentIds = components.map(c => c.id)
+  
+  // Group components by service type
+  const componentsByService = components.reduce((acc, comp) => {
+    const serviceType = comp.service
+    if (!acc[serviceType]) acc[serviceType] = []
+    acc[serviceType].push(comp)
+    return acc
+  }, {} as Record<string, InfrastructureComponent[]>)
 
-  // For web app with API Gateway, SQS, S3, DynamoDB
-  if (componentIds.includes('api-gateway') && componentIds.includes('sqs-queue') &&
-      componentIds.includes('s3-bucket') && componentIds.includes('dynamodb-table')) {
+  // Generate connections based on service types
+  const apiGateways = componentsByService['api_gateway'] || []
+  const sqsQueues = componentsByService['sqs'] || []
+  const s3Buckets = componentsByService['s3'] || []
+  const dynamoDBTables = componentsByService['dynamodb'] || []
+  const rdsInstances = componentsByService['rds'] || []
 
-    // API Gateway -> SQS (for queuing messages)
+  // Web Application Pattern: API Gateway + SQS + S3 + DynamoDB
+  if (apiGateways.length > 0 && sqsQueues.length > 0 && s3Buckets.length > 0 && dynamoDBTables.length > 0) {
+    const apiGateway = apiGateways[0]
+    const sqsQueue = sqsQueues[0]
+    const s3Bucket = s3Buckets[0]
+    const dynamoTable = dynamoDBTables[0]
+
+    // API Gateway -> SQS
     edges.push({
-      id: 'api-gateway-to-sqs',
-      source: 'api-gateway',
-      target: 'sqs-queue',
-      type: 'connection',
+      id: `${apiGateway.id}-to-${sqsQueue.id}`,
+      source: apiGateway.id,
+      target: sqsQueue.id,
+      type: 'smoothstep',
+      style: { strokeWidth: 2, stroke: '#10b981' },
       data: {
-        relationship: 'connects_to',
+        relationship: 'sends_to',
         description: 'API Gateway sends messages to SQS queue'
       }
     })
 
-    // API Gateway -> DynamoDB (for data access)
+    // API Gateway -> DynamoDB
     edges.push({
-      id: 'api-gateway-to-dynamodb',
-      source: 'api-gateway',
-      target: 'dynamodb-table',
-      type: 'connection',
+      id: `${apiGateway.id}-to-${dynamoTable.id}`,
+      source: apiGateway.id,
+      target: dynamoTable.id,
+      type: 'smoothstep',
+      style: { strokeWidth: 2, stroke: '#10b981' },
       data: {
         relationship: 'accesses',
         description: 'API Gateway accesses DynamoDB for data'
       }
     })
 
-    // API Gateway -> S3 (for static assets)
+    // API Gateway -> S3
     edges.push({
-      id: 'api-gateway-to-s3',
-      source: 'api-gateway',
-      target: 's3-bucket',
-      type: 'connection',
+      id: `${apiGateway.id}-to-${s3Bucket.id}`,
+      source: apiGateway.id,
+      target: s3Bucket.id,
+      type: 'smoothstep',
+      style: { strokeWidth: 2, stroke: '#10b981' },
       data: {
-        relationship: 'stores_in',
+        relationship: 'serves_from',
         description: 'API Gateway serves static assets from S3'
       }
     })
 
-    // SQS -> DynamoDB (for processing messages)
+    // SQS -> DynamoDB
     edges.push({
-      id: 'sqs-to-dynamodb',
-      source: 'sqs-queue',
-      target: 'dynamodb-table',
-      type: 'connection',
+      id: `${sqsQueue.id}-to-${dynamoTable.id}`,
+      source: sqsQueue.id,
+      target: dynamoTable.id,
+      type: 'smoothstep',
+      style: { strokeWidth: 2, stroke: '#10b981' },
       data: {
-        relationship: 'accesses',
-        description: 'SQS consumers access DynamoDB for data processing'
+        relationship: 'processes_to',
+        description: 'SQS consumers process data to DynamoDB'
       }
     })
 
-    // SQS -> S3 (for file processing)
+    // SQS -> S3
     edges.push({
-      id: 'sqs-to-s3',
-      source: 'sqs-queue',
-      target: 's3-bucket',
-      type: 'connection',
+      id: `${sqsQueue.id}-to-${s3Bucket.id}`,
+      source: sqsQueue.id,
+      target: s3Bucket.id,
+      type: 'smoothstep',
+      style: { strokeWidth: 2, stroke: '#10b981' },
       data: {
-        relationship: 'stores_in',
-        description: 'SQS consumers process files in S3'
+        relationship: 'processes_from',
+        description: 'SQS consumers process files from S3'
       }
     })
   }
 
+  // API + Database Pattern: API Gateway + DynamoDB
+  if (apiGateways.length > 0 && dynamoDBTables.length > 0 && sqsQueues.length === 0) {
+    const apiGateway = apiGateways[0]
+    const dynamoTable = dynamoDBTables[0]
+
+    edges.push({
+      id: `${apiGateway.id}-to-${dynamoTable.id}`,
+      source: apiGateway.id,
+      target: dynamoTable.id,
+      type: 'smoothstep',
+      style: { strokeWidth: 2, stroke: '#10b981' },
+      data: {
+        relationship: 'accesses',
+        description: 'API Gateway accesses DynamoDB for data storage'
+      }
+    })
+  }
+
+  // API + RDS Pattern: API Gateway + RDS
+  if (apiGateways.length > 0 && rdsInstances.length > 0) {
+    const apiGateway = apiGateways[0]
+    const rdsInstance = rdsInstances[0]
+
+    edges.push({
+      id: `${apiGateway.id}-to-${rdsInstance.id}`,
+      source: apiGateway.id,
+      target: rdsInstance.id,
+      type: 'smoothstep',
+      style: { strokeWidth: 2, stroke: '#10b981' },
+      data: {
+        relationship: 'connects_to',
+        description: 'API Gateway connects to RDS database'
+      }
+    })
+  }
+
+  // SQS + Storage Pattern: SQS + S3
+  if (sqsQueues.length > 0 && s3Buckets.length > 0 && apiGateways.length === 0) {
+    const sqsQueue = sqsQueues[0]
+    const s3Bucket = s3Buckets[0]
+
+    edges.push({
+      id: `${sqsQueue.id}-to-${s3Bucket.id}`,
+      source: sqsQueue.id,
+      target: s3Bucket.id,
+      type: 'smoothstep',
+      style: { strokeWidth: 2, stroke: '#10b981' },
+      data: {
+        relationship: 'processes',
+        description: 'SQS processes files in S3 bucket'
+      }
+    })
+  }
+
+  console.log('🔗 Generated connections:', edges.length, 'for components:', components.length)
   return edges
 }
 

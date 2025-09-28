@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   MessageSquare,
   Send,
@@ -48,6 +48,134 @@ export function AgentChat() {
   const [inputValue, setInputValue] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [isHydrated, setIsHydrated] = useState(false)
+  
+  // Quick demo questions
+  const demoQuestions = [
+    "What's RDS?",
+    "Why this architecture?", 
+    "How much will this cost?",
+    "How do I make it secure?",
+    "What if I have 100k users?",
+    "How does this scale?",
+    "What's DynamoDB?",
+    "How do I monitor this?",
+    "Can I add a database?",
+    "What's API Gateway?",
+    "How do I deploy this?",
+    "What's S3 used for?",
+    "How do I add authentication?",
+    "What's SQS?",
+    "How do I optimize costs?",
+    "What if it goes down?",
+    "How do I backup data?",
+    "What's the best region?",
+    "How do I add logging?",
+    "Can I use Lambda?"
+  ]
+  
+  // Get 3 random questions
+  const getRandomQuestions = () => {
+    const shuffled = [...demoQuestions].sort(() => 0.5 - Math.random())
+    return shuffled.slice(0, 3)
+  }
+  
+  const [quickQuestions, setQuickQuestions] = useState<string[]>(getRandomQuestions())
+
+  // Clean AI response text - remove unwanted formatting
+  const cleanResponseText = (text: string): string => {
+    return text
+      .replace(/\*+/g, '') // Remove asterisks
+      .replace(/#+/g, '') // Remove hash symbols
+      .replace(/_{2,}/g, '') // Remove multiple underscores
+      .replace(/~{2,}/g, '') // Remove multiple tildes
+      .replace(/`{2,}/g, '') // Remove multiple backticks
+      .replace(/\n{3,}/g, '\n\n') // Limit to max 2 newlines
+      .trim() // Remove leading/trailing whitespace
+  }
+
+  // Handle quick question click - send immediately
+  const handleQuickQuestion = useCallback(async (question: string) => {
+    console.log('🚀 AgentChat: Sending quick question:', question)
+
+    const userMessage: Message = {
+      id: `user_${Date.now()}`,
+      role: 'user',
+      content: question,
+      timestamp: Date.now()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setIsTyping(true)
+    
+    // Generate new random questions after using one
+    setQuickQuestions(getRandomQuestions())
+
+    try {
+      console.log('📡 AgentChat: Calling OpenAI agent API...')
+      // Use OpenAI agent to process the message
+      const response = await processUserMessage(question, messages.slice(-5))
+      console.log('✅ AgentChat: Received response:', response)
+
+      let agentResponse: Message
+
+      if (response.type === 'multiple_choice' && response.choices) {
+        agentResponse = {
+          id: `assistant_${Date.now()}`,
+          role: 'assistant',
+          content: cleanResponseText(response.content),
+          timestamp: Date.now(),
+          type: 'multiple_choice',
+          choices: response.choices,
+          onChoice: response.onChoice
+        }
+      } else if (response.type === 'todolist' && response.items) {
+        agentResponse = {
+          id: `assistant_${Date.now()}`,
+          role: 'assistant',
+          content: cleanResponseText(response.content),
+          timestamp: Date.now(),
+          type: 'todolist',
+          todos: response.items,
+          createInfrastructure: response.createInfrastructure
+        }
+      } else {
+        agentResponse = {
+          id: `assistant_${Date.now()}`,
+          role: 'assistant',
+          content: cleanResponseText(response.content),
+          timestamp: Date.now(),
+          type: 'text'
+        }
+      }
+
+      setMessages(prev => [...prev, agentResponse])
+
+      // Handle infrastructure creation if present
+      if (response.createInfrastructure && Array.isArray(response.createInfrastructure)) {
+        console.log('🏗️ AgentChat: Adding infrastructure to canvas:', response.createInfrastructure.length, 'components')
+        const success = await addInfrastructureToCanvas(response.createInfrastructure)
+        if (success) {
+          console.log('✅ AgentChat: Infrastructure added successfully')
+        } else {
+          console.error('❌ AgentChat: Failed to add infrastructure')
+        }
+      }
+
+    } catch (error) {
+      console.error('💥 AgentChat: Error processing quick question:', error)
+      const errorMessage: Message = {
+        id: `error_${Date.now()}`,
+        role: 'assistant',
+        content: "I apologize, but I'm having trouble processing your question right now. Please try again.",
+        timestamp: Date.now(),
+        type: 'text'
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsTyping(false)
+      console.log('🏁 AgentChat: Finished processing quick question')
+    }
+  }, [messages])
 
   // Handle hydration
   useEffect(() => {
@@ -105,6 +233,9 @@ export function AgentChat() {
     setMessages(prev => [...prev, userMessage])
     setInputValue('')
     setIsTyping(true)
+    
+    // Refresh quick questions after sending a message
+    setQuickQuestions(getRandomQuestions())
 
     try {
       console.log('📡 AgentChat: Calling OpenAI agent API...')
@@ -119,7 +250,7 @@ export function AgentChat() {
         agentResponse = {
           id: `agent_${Date.now()}`,
           role: 'assistant',
-          content: response.content,
+          content: cleanResponseText(response.content),
           timestamp: Date.now(),
           type: 'multiple_choice',
           choices: response.choices,
@@ -143,7 +274,7 @@ export function AgentChat() {
               setMessages(prev => [...prev, {
                 id: `agent_${Date.now()}`,
                 role: 'assistant',
-                content: result.content,
+                content: cleanResponseText(result.content),
                 timestamp: Date.now(),
                 type: 'todo_list',
                 todos: result.items
@@ -152,7 +283,7 @@ export function AgentChat() {
               setMessages(prev => [...prev, {
                 id: `agent_${Date.now()}`,
                 role: 'assistant',
-                content: result.content || 'Response processed.',
+                content: cleanResponseText(result.content || 'Response processed.'),
                 timestamp: Date.now()
               }])
             }
@@ -174,7 +305,7 @@ export function AgentChat() {
             setMessages(prev => [...prev, {
               id: `agent_${Date.now()}`,
               role: 'assistant',
-              content: followUpResponse.content,
+              content: cleanResponseText(followUpResponse.content),
               timestamp: Date.now(),
               type: followUpResponse.type === 'todolist' ? 'todo_list' : 'text',
               ...(followUpResponse.type === 'todolist' && { todos: followUpResponse.items })
@@ -187,7 +318,7 @@ export function AgentChat() {
         agentResponse = {
           id: `agent_${Date.now()}`,
           role: 'assistant',
-          content: response.content,
+          content: cleanResponseText(response.content),
           timestamp: Date.now(),
           type: 'todo_list',
           todos: response.items,
@@ -199,7 +330,7 @@ export function AgentChat() {
         agentResponse = {
           id: `agent_${Date.now()}`,
           role: 'assistant',
-          content: response.content || response.error || "I'm here to help with your cloud infrastructure needs.",
+          content: cleanResponseText(response.content || response.error || "I'm here to help with your cloud infrastructure needs."),
           timestamp: Date.now()
         }
       }
@@ -537,13 +668,44 @@ export function AgentChat() {
 
           {/* Input area */}
           <div className="flex-shrink-0 p-2 border-t bg-white">
-            <div className="flex gap-1">
-              <Input
+            {/* Quick Questions */}
+            {quickQuestions.length > 0 && (
+              <div className="mb-2 flex gap-2">
+                {quickQuestions.map((question, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuickQuestion(question)}
+                    className="text-xs px-2 py-1 h-6 bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                  >
+                    {question}
+                  </Button>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex gap-1 items-end">
+              <Textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Type your message..."
-                className="flex-1 h-8 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendMessage()
+                  }
+                }}
+                placeholder="Type your message... (Shift+Enter for new line)"
+                className="flex-1 min-h-[32px] max-h-[120px] text-sm resize-none"
+                style={{
+                  height: 'auto',
+                  overflow: 'hidden'
+                }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement
+                  target.style.height = 'auto'
+                  target.style.height = Math.min(target.scrollHeight, 120) + 'px'
+                }}
               />
               <Button
                 size="icon"
