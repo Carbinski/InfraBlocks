@@ -289,7 +289,7 @@ export function Dashboard() {
                 className="object-cover"
               />
             </div>
-            <span className="font-semibold text-xl text-gray-900">InfraBlocks Rex</span>
+            <span className="font-semibold text-xl text-gray-900">InfraBlocks</span>
           </div>
         </div>
 
