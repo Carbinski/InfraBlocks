@@ -177,29 +177,11 @@ export function ConfigurationPanel({
   }
 
   const getNodeIconPath = (serviceId: string, provider: string) => {
-    const iconMap: Record<string, string> = {
-      'lambda': '/aws/Arch_AWS-Lambda_64.svg',
-      'ec2': '/aws/Arch_Amazon-EC2_64.svg',
-      's3': '/aws/Arch_Amazon-S3-on-Outposts_64.svg',
-      'rds': '/aws/Arch_Amazon-RDS_64.svg',
-      'alb': '/aws/Arch_Amazon-API-Gateway_64.svg',
-      'dynamodb': '/aws/Arch_Amazon-DynamoDB_64.svg',
-      'cloudwatch': '/aws/Arch_Amazon-CloudWatch_64.svg',
-      'cognito': '/aws/Arch_Amazon-Cognito_64.svg',
-      'documentdb': '/aws/Arch_Amazon-DocumentDB_64.svg',
-      'elasticache': '/aws/Arch_Amazon-ElastiCache_64.svg',
-      'eventbridge': '/aws/Arch_Amazon-EventBridge_64.svg',
-      'memorydb': '/aws/Arch_Amazon-MemoryDB_64.svg',
-      'app-runner': '/aws/Arch_AWS-App-Runner_64.svg',
-      'batch': '/aws/Arch_AWS-Batch_64.svg',
-      'fargate': '/aws/Arch_AWS-Fargate_64.svg',
-      'iam': '/aws/Arch_AWS-IAM-Identity-Center_64.svg',
-      'secrets-manager': '/aws/Arch_AWS-Secrets-Manager_64.svg',
-      'step-functions': '/aws/Arch_AWS-Step-Functions_64.svg',
-      'x-ray': '/aws/Arch_AWS-X-Ray_64.svg'
+    // Use the icon from the loaded service config if available
+    if (loadedServiceConfig?.icon) {
+      return loadedServiceConfig.icon
     }
-
-    return iconMap[serviceId] || '/aws/Arch_Amazon-EC2_64.svg'
+    return '/aws/Arch_Amazon-EC2_64.svg'
   }
 
   const getNodeColor = (serviceId: string, provider: string) => {

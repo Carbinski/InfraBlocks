@@ -50,7 +50,12 @@ export const CloudServiceNode = memo(({ data, selected, onDoubleClick }: CloudSe
 
 
   const getNodeIcon = (serviceId: string, provider: string) => {
-    // Return appropriate icons based on service type
+    // Always use the icon from the service config first
+    if (nodeData.icon) {
+      return nodeData.icon
+    }
+    
+    // Fallback to hardcoded icons only if no config icon is available
     switch (serviceId) {
       case 'lambda':
         return 'λ'
@@ -65,7 +70,7 @@ export const CloudServiceNode = memo(({ data, selected, onDoubleClick }: CloudSe
       case 'alb':
         return '⚖️'
       default:
-        return nodeData.icon
+        return '☁️' // Generic cloud icon
     }
   }
 
