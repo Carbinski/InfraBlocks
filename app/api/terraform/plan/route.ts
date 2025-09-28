@@ -1,11 +1,32 @@
 import { spawn } from 'child_process'
 import { existsSync } from 'fs'
 import { NextRequest, NextResponse } from 'next/server'
+import { CredentialManager } from '@/lib/credential-manager'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { workingDirectory, planFile } = body
+    const { workingDirectory, planFile, credentials } = body
+
+    // Set AWS credentials as environment variables if provided
+    const env = { ...process.env }
+    if (credentials?.aws) {
+      // Validate AWS credentials format
+      const validationErrors = CredentialManager.validateAWSCredentials(credentials.aws)
+      if (validationErrors.length > 0) {
+        return NextResponse.json(
+          { error: `Invalid AWS credentials: ${validationErrors.join(', ')}` },
+          { status: 400 }
+        )
+      }
+
+      env.AWS_ACCESS_KEY_ID = credentials.aws.accessKeyId
+      env.AWS_SECRET_ACCESS_KEY = credentials.aws.secretAccessKey
+      env.AWS_DEFAULT_REGION = credentials.aws.region
+      console.log('🔑 Using AWS credentials for terraform plan')
+    } else {
+      console.warn('⚠️ No AWS credentials provided for terraform plan')
+    }
 
     console.log('🚀 Terraform Plan API called:', {
       workingDirectory,
@@ -32,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     const args = planFile ? ['-out', planFile] : []
     console.log('🚀 Executing terraform plan command with args:', args)
-    const result = await executeTerraformCommand('plan', args, workingDirectory)
+    const result = await executeTerraformCommand('plan', args, workingDirectory, env)
     
     console.log('📊 Terraform plan result:', {
       success: result.success,
@@ -88,7 +109,8 @@ export async function POST(request: NextRequest) {
 function executeTerraformCommand(
   command: string,
   args: string[],
-  workingDirectory: string
+  workingDirectory: string,
+  env?: NodeJS.ProcessEnv
 ): Promise<{ success: boolean; output: string; error?: string; exitCode: number }> {
   return new Promise((resolve) => {
     const fullCommand = `terraform ${command} ${args.join(' ')}`
@@ -97,10 +119,11 @@ function executeTerraformCommand(
       workingDirectory,
       timestamp: new Date().toISOString()
     })
-    
+
     const terraform = spawn('terraform', [command, ...args], {
       cwd: workingDirectory,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: env || process.env
     })
 
     let output = ''

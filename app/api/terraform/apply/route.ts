@@ -1,11 +1,11 @@
 import { spawn } from 'child_process'
-import { existsSync } from 'fs'
 import { NextRequest, NextResponse } from 'next/server'
+import { CredentialManager } from '@/lib/credential-manager'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { workingDirectory, planFile, autoApprove } = body
+    const { workingDirectory, planFile, autoApprove, credentials } = body
     
     console.log('🚀 Terraform Apply API called:', {
       workingDirectory,
@@ -24,44 +24,15 @@ export async function POST(request: NextRequest) {
 
     const args = []
     if (planFile) {
-      // Check if plan file exists
-      const planFileExists = existsSync(planFile)
-      console.log('📁 Plan file check:', {
-        planFile,
-        exists: planFileExists
-      })
-      
-      if (planFileExists) {
-        args.push(planFile)
-        console.log('📋 Using plan file:', planFile)
-      } else {
-        console.warn('⚠️ Plan file does not exist, falling back to auto-approve mode')
-        if (autoApprove) {
-          args.push('-auto-approve')
-          console.log('⚡ Auto-approve enabled (fallback)')
-        } else {
-          return NextResponse.json(
-            { error: `Plan file not found: ${planFile}. Please run terraform plan first or enable auto-approve.` },
-            { status: 400 }
-          )
-        }
-      }
+      args.push(planFile)
+      console.log('📋 Using plan file:', planFile)
     } else if (autoApprove) {
       args.push('-auto-approve')
       console.log('⚡ Auto-approve enabled')
     }
 
-    // Check if working directory exists
-    if (!existsSync(workingDirectory)) {
-      console.error('❌ Working directory does not exist:', workingDirectory)
-      return NextResponse.json(
-        { error: `Working directory does not exist: ${workingDirectory}` },
-        { status: 400 }
-      )
-    }
-
     console.log('🚀 Executing terraform apply command with args:', args)
-    const result = await executeTerraformCommand('apply', args, workingDirectory)
+    const result = await executeTerraformCommand('apply', args, workingDirectory, credentials)
     
     console.log('📊 Terraform apply result:', {
       success: result.success,
@@ -94,7 +65,8 @@ export async function POST(request: NextRequest) {
 function executeTerraformCommand(
   command: string,
   args: string[],
-  workingDirectory: string
+  workingDirectory: string,
+  credentials?: any
 ): Promise<{ success: boolean; output: string; error?: string; exitCode: number }> {
   return new Promise((resolve) => {
     const fullCommand = `terraform ${command} ${args.join(' ')}`
@@ -103,10 +75,19 @@ function executeTerraformCommand(
       workingDirectory,
       timestamp: new Date().toISOString()
     })
-    
+
+    // Prepare environment variables with AWS credentials
+    const env = { ...process.env }
+    if (credentials?.aws) {
+      env.AWS_ACCESS_KEY_ID = credentials.aws.accessKeyId
+      env.AWS_SECRET_ACCESS_KEY = credentials.aws.secretAccessKey
+      env.AWS_DEFAULT_REGION = credentials.aws.region
+    }
+
     const terraform = spawn('terraform', [command, ...args], {
       cwd: workingDirectory,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env
     })
 
     let output = ''
