@@ -189,7 +189,7 @@ function generateMainTfOnly(resources: any[]): string {
     })
     
     if (resource.dependencies && resource.dependencies.length > 0) {
-      content += `  depends_on = [${resource.dependencies.map((dep: string) => `${dep}`).join(', ')}]\n`
+      content += `  depends_on = [${resource.dependencies.map((dep: string) => dep).join(', ')}]\n`
     }
     
     content += '}\n\n'
@@ -419,10 +419,9 @@ async function generateAdditionalFiles(
 function generateAWSSecurityGroups(nodes: Node[]): string {
   const hasEC2 = nodes.some(node => node.data.id === 'ec2')
   const hasExistingVPC = nodes.some(node => node.data.id === 'vpc')
-  
-  // Don't generate security groups if we have EC2 instances, as they will be generated
-  // by the NetworkInfrastructureGenerator in the main resources
-  if (!hasEC2 || !hasExistingVPC) return ''
+
+  // Generate security groups when we have EC2 instances that need network access
+  if (!hasEC2) return ''
 
   return `# Security Groups
 resource "aws_security_group" "default" {
@@ -468,8 +467,9 @@ resource "aws_security_group" "default" {
  * Generate AWS VPC configuration
  */
 function generateAWSVPCConfig(nodes: Node[]): string {
-  const hasVPC = nodes.some(node => node.data.id === 'vpc')
-  if (!hasVPC) return ''
+  const hasEC2 = nodes.some(node => node.data.id === 'ec2')
+  // Generate VPC config when we have EC2 instances that need network infrastructure
+  if (!hasEC2) return ''
 
   return `# VPC Configuration
 resource "aws_vpc" "main" {

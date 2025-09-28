@@ -34,8 +34,11 @@ import {
   Code,
   Download,
   History,
-  Play
+  Play,
+  Pin,
+  Brain
 } from "lucide-react"
+import GlassyPaneContainer from '@/src/cedar/components/containers/GlassyPaneContainer'
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { CloudServiceNode } from "./cloud-service-node"
 import { ConfigurationPanel } from "./configuration-panel"
@@ -44,6 +47,8 @@ import { DeploymentStatusPanel } from "./deployment-status-panel"
 import { TerraformGenerator } from "./terraform-generator"
 import { UndoRedoControls } from "./undo-redo-controls"
 import { useCanvasHistory } from "@/hooks/use-canvas-history"
+
+import { AIReviewDialog } from "./ai-review-dialog"
 
 
 const createNodeTypes = (onNodeDoubleClick: (nodeData: any) => void) => ({
@@ -126,6 +131,10 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
   const [isDeploying, setIsDeploying] = useState(false)
   const [deploymentError, setDeploymentError] = useState<string | null>(null)
   const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
+  const [isAIReviewOpen, setIsAIReviewOpen] = useState(false)
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null)
+  const [isAIReviewLoading, setIsAIReviewLoading] = useState(false)
+  const [aiReviewError, setAiReviewError] = useState<string | null>(null)
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
 
   const providerConfig = {
@@ -380,6 +389,38 @@ export function InfrastructureCanvas({ provider, onBack }: InfrastructureCanvasP
     // Optional: Add visual feedback (could be enhanced with toast notifications)
     // For now, we'll just log the success
     console.log('✅ Configuration saved successfully!')
+  }
+
+  const handleAIReview = async () => {
+    setIsAIReviewOpen(true)
+    setIsAIReviewLoading(true)
+    setAiReviewError(null)
+    setAiAnalysis(null)
+
+    try {
+      const response = await fetch('/api/ai-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          terraformFiles,
+          provider,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const analysis = await response.json()
+      setAiAnalysis(analysis)
+    } catch (error) {
+      console.error('AI Review Error:', error)
+      setAiReviewError(error instanceof Error ? error.message : 'Failed to analyze infrastructure')
+    } finally {
+      setIsAIReviewLoading(false)
+    }
   }
 
   // Generate Terraform code from nodes
@@ -878,6 +919,23 @@ provider "aws" {
                 </ReactFlow>
               </ReactFlowProvider>
             </div>
+            
+            {/* AI Review Button - Bottom Right */}
+            <div className="absolute bottom-4 right-4 pointer-events-none z-10">
+              <div className="pointer-events-auto">
+                <GlassyPaneContainer
+                  className="cursor-pointer hover:scale-105 transition-transform duration-200"
+                  onClick={handleAIReview}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <button className="px-6 py-3 flex items-center gap-2 text-sm font-medium text-gray-800 hover:text-gray-900">
+                    <Brain className="w-5 h-5" />
+                    AI Review
+                  </button>
+                </GlassyPaneContainer>
+              </div>
+            </div>
           </div>
         </main>
 
@@ -998,6 +1056,16 @@ provider "aws" {
         isOpen={showDeploymentStatus}
         onClose={() => setShowDeploymentStatus(false)}
       />
+      
+      {/* AI Review Dialog */}
+      <AIReviewDialog
+        isOpen={isAIReviewOpen}
+        onClose={() => setIsAIReviewOpen(false)}
+        analysis={aiAnalysis}
+        isLoading={isAIReviewLoading}
+        error={aiReviewError}
+      />
     </div>
   )
 }
+

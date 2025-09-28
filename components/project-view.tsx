@@ -112,32 +112,6 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              {selectedProvider && (
-                <Button variant="ghost" size="sm" onClick={handleProviderChange} className="hover:bg-accent">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Change Provider
-                </Button>
-              )}
-
-              <Button variant="ghost" size="sm" className="hover:bg-accent">
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="hover:bg-accent">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Project
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
           </header>
 
           {/* Project Content */}
