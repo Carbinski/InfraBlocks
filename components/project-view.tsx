@@ -18,7 +18,20 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  ArrowLeft,
+  MoreHorizontal,
+  Settings,
+  Share,
+  RefreshCw,
+  Trash2,
+} from "lucide-react"
 
 interface Project {
   id: string
@@ -42,16 +55,29 @@ interface ProjectViewProps {
 function InfrastructureCanvasWrapper({
   provider,
   onBack,
+  projectId,
 }: {
   provider: "aws" | "gcp" | "azure"
   onBack: () => void
+  projectId: string
 }) {
-  // Dev log is fine in client comps
   console.log("🎨 InfrastructureCanvasWrapper: Rendering canvas with provider:", provider)
-  return <InfrastructureCanvas provider={provider} onBack={onBack} />
+  return (
+    <InfrastructureCanvas
+      provider={provider}
+      onBack={onBack}
+      // If InfrastructureCanvas doesn't accept projectId, delete the next line.
+      projectId={projectId}
+    />
+  )
 }
 
-export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject }: ProjectViewProps) {
+export function ProjectView({
+  project,
+  onBack,
+  onUpdateProject,
+  onDeleteProject,
+}: ProjectViewProps) {
   const [selectedProvider, setSelectedProvider] = useState<"aws" | "gcp" | "azure" | null>(project.provider || null)
   const [showCanvas, setShowCanvas] = useState(!!project.provider)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -115,6 +141,36 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
                 </Badge>
               )}
             </div>
+
+            {/* Three dots menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Project Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Share className="w-4 h-4 mr-2" />
+                  Share Project
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Project
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </header>
 
           {/* Project Content */}
@@ -137,11 +193,11 @@ export function ProjectView({ project, onBack, onUpdateProject, onDeleteProject 
         <>
           {console.log("🎨 ProjectView: Rendering canvas with provider:", selectedProvider)}
           <ReactFlowProvider>
-            {/* Guard against null just in case */}
             {selectedProvider && (
               <InfrastructureCanvasWrapper
                 provider={selectedProvider}
                 onBack={handleBackToProviderSelection}
+                projectId={project.id}
               />
             )}
           </ReactFlowProvider>
