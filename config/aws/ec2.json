@@ -7,9 +7,9 @@
   "terraformType": "aws_instance",
   "defaultConfig": {
     "instance_type": "t3.micro",
-    "ami": "ami-0abcdef1234567890",
+    "ami": "ami-0c02fb55956c7d316",
     "key_name": "",
-    "vpc_security_group_ids": []
+    "associate_public_ip_address": false
   },
   "configSchema": {
     "instance_type": {
@@ -24,7 +24,7 @@
       "type": "string",
       "label": "AMI ID",
       "description": "The Amazon Machine Image (AMI) to use for the instance",
-      "default": "ami-0abcdef1234567890",
+      "default": "ami-0c02fb55956c7d316",
       "required": true,
       "validation": {
         "pattern": "^ami-[0-9a-f]{8,17}$"
@@ -39,14 +39,14 @@
     "vpc_security_group_ids": {
       "type": "multiselect",
       "label": "Security Groups",
-      "description": "List of security group IDs to associate with the instance",
+      "description": "List of security group IDs to associate with the instance (auto-generated if not specified)",
       "options": [],
       "required": false
     },
     "subnet_id": {
       "type": "string",
       "label": "Subnet ID",
-      "description": "The VPC subnet ID to launch the instance in",
+      "description": "The VPC subnet ID to launch the instance in (auto-generated if not specified)",
       "required": false
     },
     "associate_public_ip_address": {

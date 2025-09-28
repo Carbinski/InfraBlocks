@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import type { Edge, Node } from "@xyflow/react"
 import { CheckCircle, Copy, Download } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { TerraformGenerator } from "./terraform-generator"
 
 interface TerraformExportDialogProps {
@@ -24,8 +24,25 @@ export function TerraformExportDialog({ provider, nodes, edges, children }: Terr
   const [activeTab, setActiveTab] = useState("terraform")
 
   const generator = new TerraformGenerator(provider, nodes, edges)
-  const terraformCode = generator.generateTerraformCode()
-  const terraformOutput = generator.generate()
+  const [terraformCode, setTerraformCode] = useState("")
+  const [terraformOutput, setTerraformOutput] = useState<any>(null)
+
+  useEffect(() => {
+    const loadTerraformData = async () => {
+      try {
+        const [code, output] = await Promise.all([
+          generator.generateTerraformCode(),
+          generator.generate()
+        ])
+        setTerraformCode(code)
+        setTerraformOutput(output)
+      } catch (error) {
+        console.error('Error loading Terraform data:', error)
+      }
+    }
+    
+    loadTerraformData()
+  }, [provider, nodes, edges])
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -161,7 +178,7 @@ export function TerraformExportDialog({ provider, nodes, edges, children }: Terr
               <div className="space-y-3">
                 <h3 className="font-semibold">Generated Resources</h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {terraformOutput.resources.map((resource, index) => (
+                  {terraformOutput.resources.map((resource: any, index: number) => (
                     <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded">
                       <div>
                         <div className="font-medium text-sm">{resource.name}</div>

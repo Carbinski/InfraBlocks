@@ -1,3 +1,5 @@
+import { ConfigLoader, type ServiceConfig } from "@/lib/config-loader"
+import { NetworkInfrastructureGenerator } from "@/lib/network-infrastructure-generator"
 import type { Edge, Node } from "@xyflow/react"
 
 export interface TerraformResource {
@@ -25,8 +27,8 @@ export class TerraformGenerator {
     this.edges = edges
   }
 
-  generate(): TerraformOutput {
-    const resources = this.generateResources()
+  async generate(): Promise<TerraformOutput> {
+    const resources = await this.generateResources()
     const variables = this.generateVariables()
     const outputs = this.generateOutputs()
 
@@ -38,12 +40,22 @@ export class TerraformGenerator {
     }
   }
 
-  private generateResources(): TerraformResource[] {
+  private async generateResources(): Promise<TerraformResource[]> {
     const resources: TerraformResource[] = []
     
-    this.nodes.forEach((node) => {
+    // Generate VPC infrastructure if needed (AWS only)
+    if (this.provider === 'aws' && NetworkInfrastructureGenerator.needsVPCInfrastructure(this.nodes)) {
+      // Add VPC infrastructure resources
+      resources.push(...NetworkInfrastructureGenerator.generateVPCInfrastructure())
+      
+      // Add default security group and its rules
+      resources.push(NetworkInfrastructureGenerator.generateDefaultSecurityGroup())
+      resources.push(...NetworkInfrastructureGenerator.generateSecurityGroupRules())
+    }
+    
+    for (const node of this.nodes) {
       const dependencies = this.getDependencies(node.id)
-      const config = this.generateResourceConfig(node)
+      const config = await this.generateResourceConfig(node)
 
       // Add the main resource
       resources.push({
@@ -69,16 +81,36 @@ export class TerraformGenerator {
           dependencies: [`${node.data.terraformType as string}.${this.sanitizeName((node.data.name as string) || (node.data.id as string))}`],
         })
       }
-    })
+    }
     
     return resources
   }
 
-  private generateResourceConfig(node: Node): Record<string, any> {
+  private async generateResourceConfig(node: Node): Promise<Record<string, any>> {
     const baseConfig = { ...(node.data.config as Record<string, any>) }
     const serviceId = node.data.id as string
 
-    // Apply provider-specific configurations
+    // Load service configuration from JSON files
+    const serviceConfig = await ConfigLoader.loadServiceConfig(this.provider, serviceId)
+    
+    if (serviceConfig) {
+      // Merge user config with default config from JSON
+      const mergedConfig = { ...serviceConfig.defaultConfig, ...baseConfig }
+      
+      // Apply provider-specific configurations
+      switch (this.provider) {
+        case "aws":
+          return this.generateAWSConfig(serviceId, mergedConfig, node, serviceConfig)
+        case "gcp":
+          return this.generateGCPConfig(serviceId, mergedConfig, node, serviceConfig)
+        case "azure":
+          return this.generateAzureConfig(serviceId, mergedConfig, node, serviceConfig)
+        default:
+          return mergedConfig
+      }
+    }
+
+    // Fallback to old behavior if config loading fails
     switch (this.provider) {
       case "aws":
         return this.generateAWSConfig(serviceId, baseConfig, node)
@@ -91,21 +123,29 @@ export class TerraformGenerator {
     }
   }
 
-  private generateAWSConfig(serviceId: string, config: Record<string, any>, node: Node): Record<string, any> {
+  private generateAWSConfig(serviceId: string, config: Record<string, any>, node: Node, serviceConfig?: ServiceConfig): Record<string, any> {
     const resourceConfig: Record<string, any> = { ...config }
 
+    // Add common fields
+    resourceConfig.tags = {
+      Name: config.name || node.data.name,
+      Environment: "terraform-generated",
+    }
+
+    // Add provider-specific fields based on service type
     switch (serviceId) {
       case "ec2":
+        // Use values from config (which includes defaults from JSON)
         return {
-          ami: config.ami || "ami-0abcdef1234567890",
-          instance_type: config.instance_type || "t3.micro",
+          ami: config.ami,
+          instance_type: config.instance_type,
           key_name: config.key_name || null,
-          vpc_security_group_ids: this.getSecurityGroupReferences(node.id),
-          subnet_id: this.getSubnetReference(node.id),
-          tags: {
-            Name: config.name || `${node.data.name}-instance`,
-            Environment: "terraform-generated",
-          },
+          vpc_security_group_ids: config.vpc_security_group_ids && config.vpc_security_group_ids.length > 0 
+            ? config.vpc_security_group_ids 
+            : [NetworkInfrastructureGenerator.getSecurityGroupReference()],
+          subnet_id: config.subnet_id || NetworkInfrastructureGenerator.getSubnetReference(serviceId),
+          associate_public_ip_address: config.associate_public_ip_address,
+          tags: resourceConfig.tags,
         }
 
       case "s3":
@@ -114,68 +154,53 @@ export class TerraformGenerator {
           versioning: {
             enabled: config.versioning === "Enabled",
           },
-          tags: {
-            Name: config.name || node.data.name,
-            Environment: "terraform-generated",
-          },
+          tags: resourceConfig.tags,
         }
 
       case "rds":
         return {
           identifier: config.db_name || `${this.sanitizeName(node.data.name as string)}-db`,
-          engine: config.engine || "mysql",
-          engine_version: this.getEngineVersion(config.engine || "mysql"),
-          instance_class: config.instance_class || "db.t3.micro",
+          engine: config.engine,
+          engine_version: this.getEngineVersion(config.engine),
+          instance_class: config.instance_class,
           allocated_storage: Number.parseInt(config.allocated_storage) || 20,
           db_name: config.db_name || "mydb",
           username: "admin",
           password: "var.db_password",
-          vpc_security_group_ids: this.getSecurityGroupReferences(node.id),
+          vpc_security_group_ids: [NetworkInfrastructureGenerator.getSecurityGroupReference()],
           db_subnet_group_name: this.getDBSubnetGroupReference(node.id),
           skip_final_snapshot: true,
-          tags: {
-            Name: config.name || node.data.name,
-            Environment: "terraform-generated",
-          },
+          tags: resourceConfig.tags,
         }
 
       case "lambda":
         return {
           function_name: config.function_name || `${this.sanitizeName(node.data.name as string)}-function`,
-          runtime: config.runtime || "nodejs18.x",
+          runtime: config.runtime,
           handler: "index.handler",
           filename: "lambda_function.zip",
           memory_size: Number.parseInt(config.memory_size) || 128,
           timeout: Number.parseInt(config.timeout) || 30,
           role: "aws_iam_role.lambda_role.arn",
-          tags: {
-            Name: config.name || node.data.name,
-            Environment: "terraform-generated",
-          },
+          tags: resourceConfig.tags,
         }
 
       case "vpc":
         return {
-          cidr_block: config.cidr_block || "10.0.0.0/16",
+          cidr_block: config.cidr_block,
           enable_dns_hostnames: config.enable_dns_hostnames !== false,
           enable_dns_support: config.enable_dns_support !== false,
-          tags: {
-            Name: config.name || `${node.data.name}-vpc`,
-            Environment: "terraform-generated",
-          },
+          tags: resourceConfig.tags,
         }
 
       case "alb":
         return {
           name: config.name || `${this.sanitizeName(node.data.name as string)}-alb`,
-          load_balancer_type: config.load_balancer_type || "application",
-          scheme: config.scheme || "internet-facing",
-          subnets: [this.getSubnetReference(node.id)],
-          security_groups: this.getSecurityGroupReferences(node.id),
-          tags: {
-            Name: config.name || node.data.name,
-            Environment: "terraform-generated",
-          },
+          load_balancer_type: config.load_balancer_type,
+          scheme: config.scheme,
+          subnets: [NetworkInfrastructureGenerator.getSubnetReference(serviceId)],
+          security_groups: [NetworkInfrastructureGenerator.getSecurityGroupReference()],
+          tags: resourceConfig.tags,
         }
 
       default:
@@ -183,7 +208,7 @@ export class TerraformGenerator {
     }
   }
 
-  private generateGCPConfig(serviceId: string, config: Record<string, any>, node: Node): Record<string, any> {
+  private generateGCPConfig(serviceId: string, config: Record<string, any>, node: Node, serviceConfig?: ServiceConfig): Record<string, any> {
     switch (serviceId) {
       case "compute":
         return {
@@ -230,7 +255,7 @@ export class TerraformGenerator {
     }
   }
 
-  private generateAzureConfig(serviceId: string, config: Record<string, any>, node: Node): Record<string, any> {
+  private generateAzureConfig(serviceId: string, config: Record<string, any>, node: Node, serviceConfig?: ServiceConfig): Record<string, any> {
     switch (serviceId) {
       case "vm":
         return {
@@ -396,23 +421,14 @@ export class TerraformGenerator {
     return versions[engine] || "8.0"
   }
 
-  private getSecurityGroupReferences(nodeId: string): string[] {
-    // This would be enhanced to find actual security group connections
-    return ["aws_security_group.default.id"]
-  }
-
-  private getSubnetReference(nodeId: string): string {
-    // This would be enhanced to find actual subnet connections
-    return "aws_subnet.main.id"
-  }
 
   private getDBSubnetGroupReference(nodeId: string): string {
     // This would be enhanced to find actual DB subnet group connections
     return "aws_db_subnet_group.main.name"
   }
 
-  generateTerraformCode(): string {
-    const output = this.generate()
+  async generateTerraformCode(): Promise<string> {
+    const output = await this.generate()
     let terraformCode = ""
 
     // Provider configuration
@@ -452,23 +468,30 @@ export class TerraformGenerator {
       terraformCode += "}\n\n"
     })
 
-    // Outputs
+
+    return terraformCode
+  }
+
+  async generateOutputsFile(): Promise<string> {
+    const output = await this.generate()
+    let outputsCode = ""
+
     if (Object.keys(output.outputs).length > 0) {
-      terraformCode += "# Outputs\n"
+      outputsCode += "# Outputs\n"
       Object.entries(output.outputs).forEach(([name, config]) => {
-        terraformCode += `output "${name}" {\n`
+        outputsCode += `output "${name}" {\n`
         Object.entries(config as Record<string, any>).forEach(([key, value]) => {
           if (typeof value === "string") {
-            terraformCode += `  ${key} = "${value}"\n`
+            outputsCode += `  ${key} = "${value}"\n`
           } else {
-            terraformCode += `  ${key} = ${value}\n`
+            outputsCode += `  ${key} = ${value}\n`
           }
         })
-        terraformCode += "}\n\n"
+        outputsCode += "}\n\n"
       })
     }
 
-    return terraformCode
+    return outputsCode
   }
 
   generateProviderBlock(): string {

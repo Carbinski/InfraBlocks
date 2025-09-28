@@ -1,4 +1,5 @@
 import { spawn } from 'child_process'
+import { existsSync } from 'fs'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -23,11 +24,40 @@ export async function POST(request: NextRequest) {
 
     const args = []
     if (planFile) {
-      args.push(planFile)
-      console.log('📋 Using plan file:', planFile)
+      // Check if plan file exists
+      const planFileExists = existsSync(planFile)
+      console.log('📁 Plan file check:', {
+        planFile,
+        exists: planFileExists
+      })
+      
+      if (planFileExists) {
+        args.push(planFile)
+        console.log('📋 Using plan file:', planFile)
+      } else {
+        console.warn('⚠️ Plan file does not exist, falling back to auto-approve mode')
+        if (autoApprove) {
+          args.push('-auto-approve')
+          console.log('⚡ Auto-approve enabled (fallback)')
+        } else {
+          return NextResponse.json(
+            { error: `Plan file not found: ${planFile}. Please run terraform plan first or enable auto-approve.` },
+            { status: 400 }
+          )
+        }
+      }
     } else if (autoApprove) {
       args.push('-auto-approve')
       console.log('⚡ Auto-approve enabled')
+    }
+
+    // Check if working directory exists
+    if (!existsSync(workingDirectory)) {
+      console.error('❌ Working directory does not exist:', workingDirectory)
+      return NextResponse.json(
+        { error: `Working directory does not exist: ${workingDirectory}` },
+        { status: 400 }
+      )
     }
 
     console.log('🚀 Executing terraform apply command with args:', args)

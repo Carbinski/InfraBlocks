@@ -205,10 +205,40 @@ export async function deployInfrastructure(request: DeploymentRequest): Promise<
     if (!planResponse.ok) {
       const errorData = await planResponse.json()
       console.error('❌ Terraform plan failed:', errorData)
-      throw new Error(`Terraform plan failed: ${errorData.error}`)
+      deployment.status = 'failed'
+      deployment.message = `Terraform plan failed: ${errorData.error}`
+      deployment.logs.push(`❌ Plan failed: ${errorData.error}`)
+      deployment.updatedAt = new Date().toISOString()
+      deployments.set(deploymentId, deployment)
+      activeDeployments.delete(deploymentId)
+      return {
+        success: false,
+        deploymentId,
+        workspaceId: deployment.workspaceId,
+        error: `Terraform plan failed: ${errorData.error}`,
+        logs: deployment.logs
+      }
     }
 
     const planData = await planResponse.json()
+    
+    // Check if plan was successful
+    if (!planData.success) {
+      console.error('❌ Terraform plan command failed:', planData)
+      deployment.status = 'failed'
+      deployment.message = `Terraform plan command failed: ${planData.error || 'Unknown error'}`
+      deployment.logs.push(`❌ Plan command failed: ${planData.error || 'Unknown error'}`)
+      deployment.updatedAt = new Date().toISOString()
+      deployments.set(deploymentId, deployment)
+      activeDeployments.delete(deploymentId)
+      return {
+        success: false,
+        deploymentId,
+        workspaceId: deployment.workspaceId,
+        error: `Terraform plan command failed: ${planData.error || 'Unknown error'}`,
+        logs: deployment.logs
+      }
+    }
     console.log('✅ Terraform plan successful:', {
       success: planData.success,
       exitCode: planData.exitCode,
@@ -259,10 +289,41 @@ export async function deployInfrastructure(request: DeploymentRequest): Promise<
     if (!applyResponse.ok) {
       const errorData = await applyResponse.json()
       console.error('❌ Terraform apply failed:', errorData)
-      throw new Error(`Terraform apply failed: ${errorData.error}`)
+      deployment.status = 'failed'
+      deployment.message = `Terraform apply failed: ${errorData.error}`
+      deployment.logs.push(`❌ Apply failed: ${errorData.error}`)
+      deployment.updatedAt = new Date().toISOString()
+      deployments.set(deploymentId, deployment)
+      activeDeployments.delete(deploymentId)
+      return {
+        success: false,
+        deploymentId,
+        workspaceId: deployment.workspaceId,
+        error: `Terraform apply failed: ${errorData.error}`,
+        logs: deployment.logs
+      }
     }
 
     const applyData = await applyResponse.json()
+    
+    // Check if apply was successful
+    if (!applyData.success) {
+      console.error('❌ Terraform apply command failed:', applyData)
+      deployment.status = 'failed'
+      deployment.message = `Terraform apply command failed: ${applyData.error || 'Unknown error'}`
+      deployment.logs.push(`❌ Apply command failed: ${applyData.error || 'Unknown error'}`)
+      deployment.updatedAt = new Date().toISOString()
+      deployments.set(deploymentId, deployment)
+      activeDeployments.delete(deploymentId)
+      return {
+        success: false,
+        deploymentId,
+        workspaceId: deployment.workspaceId,
+        error: `Terraform apply command failed: ${applyData.error || 'Unknown error'}`,
+        logs: deployment.logs
+      }
+    }
+    
     console.log('✅ Terraform apply successful:', {
       success: applyData.success,
       exitCode: applyData.exitCode,

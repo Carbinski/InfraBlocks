@@ -24,7 +24,7 @@ export function ConfigurationPanel({
   const [loadedServiceConfig, setLoadedServiceConfig] = useState<ServiceConfig | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Load service configuration when component mounts
+  
   useEffect(() => {
     const loadConfig = async () => {
       if (!nodeData?.provider || !nodeData?.id) return

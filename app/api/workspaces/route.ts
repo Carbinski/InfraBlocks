@@ -98,7 +98,7 @@ async function generateTerraformFiles(
   edges: Edge[]
 ): Promise<GeneratedFiles> {
   const generator = new TerraformGenerator(workspace.provider, nodes, edges)
-  const output = generator.generate()
+  const output = await generator.generate()
 
   // Generate main.tf with only resources (no variables, outputs, or provider config)
   const mainTf = generateMainTfOnly(output.resources)
@@ -161,7 +161,17 @@ function generateMainTfOnly(resources: any[]): string {
       } else if (typeof value === 'number' || typeof value === 'boolean') {
         content += `  ${key} = ${value}\n`
       } else if (Array.isArray(value)) {
-        content += `  ${key} = [${value.map(v => typeof v === 'string' ? `"${v}"` : v).join(', ')}]\n`
+        content += `  ${key} = [${value.map(v => {
+          if (typeof v === 'string') {
+            // Check if it's a Terraform reference (like aws_security_group.default.id)
+            if (v.startsWith('var.') || v.startsWith('aws_') || v.startsWith('google_') || v.startsWith('azurerm_')) {
+              return v
+            } else {
+              return `"${v}"`
+            }
+          }
+          return v
+        }).join(', ')}]\n`
       } else if (typeof value === 'object') {
         // Special handling for different types of objects
         if (key === 'tags') {
@@ -408,7 +418,11 @@ async function generateAdditionalFiles(
  */
 function generateAWSSecurityGroups(nodes: Node[]): string {
   const hasEC2 = nodes.some(node => node.data.id === 'ec2')
-  if (!hasEC2) return ''
+  const hasExistingVPC = nodes.some(node => node.data.id === 'vpc')
+  
+  // Don't generate security groups if we have EC2 instances, as they will be generated
+  // by the NetworkInfrastructureGenerator in the main resources
+  if (!hasEC2 || !hasExistingVPC) return ''
 
   return `# Security Groups
 resource "aws_security_group" "default" {

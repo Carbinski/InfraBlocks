@@ -21,6 +21,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if working directory exists
+    if (!existsSync(workingDirectory)) {
+      console.error('❌ Working directory does not exist:', workingDirectory)
+      return NextResponse.json(
+        { error: `Working directory does not exist: ${workingDirectory}` },
+        { status: 400 }
+      )
+    }
+
     const args = planFile ? ['-out', planFile] : []
     console.log('🚀 Executing terraform plan command with args:', args)
     const result = await executeTerraformCommand('plan', args, workingDirectory)

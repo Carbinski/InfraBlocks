@@ -1,0 +1,48 @@
+{
+  "id": "cognito",
+  "name": "Cognito",
+  "icon": "/aws/Arch_Amazon-Cognito_64.svg",
+  "category": "Security",
+  "description": "User authentication and management",
+  "terraformType": "aws_cognito_user_pool",
+  "defaultConfig": {
+    "name": "user-pool",
+    "alias_attributes": ["email"],
+    "auto_verified_attributes": ["email"]
+  },
+  "configSchema": {
+    "name": {
+      "type": "string",
+      "label": "User Pool Name",
+      "description": "The name of the Cognito User Pool",
+      "required": true
+    },
+    "alias_attributes": {
+      "type": "multiselect",
+      "label": "Alias Attributes",
+      "description": "Attributes that can be used as aliases",
+      "options": ["email", "phone_number", "preferred_username"],
+      "default": ["email"]
+    },
+    "auto_verified_attributes": {
+      "type": "multiselect",
+      "label": "Auto Verified Attributes",
+      "description": "Attributes that are automatically verified",
+      "options": ["email", "phone_number"],
+      "default": ["email"]
+    },
+    "password_policy": {
+      "type": "string",
+      "label": "Password Policy",
+      "description": "JSON string of password policy settings",
+      "required": false
+    },
+    "mfa_configuration": {
+      "type": "select",
+      "label": "MFA Configuration",
+      "description": "Multi-factor authentication configuration",
+      "options": ["OFF", "ON", "OPTIONAL"],
+      "default": "OFF"
+    }
+  }
+}
