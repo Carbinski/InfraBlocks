@@ -38,6 +38,7 @@ const PROVIDER_SERVICES: Record<string, string[]> = {
     'rds',
     's3',
     'secrets_manager',
+    'sqs',
     'step_functions',
     'vpc'
   ],
