@@ -1,10 +1,31 @@
 import { spawn } from 'child_process'
 import { NextRequest, NextResponse } from 'next/server'
+import { CredentialManager } from '@/lib/credential-manager'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { workingDirectory } = body
+    const { workingDirectory, credentials } = body
+
+    // Set AWS credentials as environment variables if provided
+    const env = { ...process.env }
+    if (credentials?.aws) {
+      // Validate AWS credentials format
+      const validationErrors = CredentialManager.validateAWSCredentials(credentials.aws)
+      if (validationErrors.length > 0) {
+        return NextResponse.json(
+          { error: `Invalid AWS credentials: ${validationErrors.join(', ')}` },
+          { status: 400 }
+        )
+      }
+
+      env.AWS_ACCESS_KEY_ID = credentials.aws.accessKeyId
+      env.AWS_SECRET_ACCESS_KEY = credentials.aws.secretAccessKey
+      env.AWS_DEFAULT_REGION = credentials.aws.region
+      console.log('🔑 Using AWS credentials for terraform init')
+    } else {
+      console.warn('⚠️ No AWS credentials provided for terraform init')
+    }
     
     console.log('🔧 Terraform Init API called:', {
       workingDirectory,
@@ -20,20 +41,30 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🚀 Executing terraform init command...')
-    const result = await executeTerraformCommand('init', [], workingDirectory)
-    
+    const result = await executeTerraformCommand('init', [], workingDirectory, env)
+
     console.log('📊 Terraform init result:', {
       success: result.success,
       exitCode: result.exitCode,
       outputLength: result.output?.length || 0,
       errorLength: result.error?.length || 0
     })
-    
+
     if (result.output) {
       console.log('📋 Terraform init output:', result.output)
     }
     if (result.error) {
-      console.warn('⚠️ Terraform init error:', result.error)
+      console.error('⚠️ Terraform init error:', result.error)
+    }
+
+    // If terraform init failed, return the actual error from terraform
+    if (!result.success) {
+      return NextResponse.json({
+        success: false,
+        error: result.error || 'Terraform init failed',
+        output: result.output,
+        exitCode: result.exitCode
+      })
     }
     
     return NextResponse.json(result)
@@ -53,7 +84,8 @@ export async function POST(request: NextRequest) {
 function executeTerraformCommand(
   command: string,
   args: string[],
-  workingDirectory: string
+  workingDirectory: string,
+  env?: NodeJS.ProcessEnv
 ): Promise<{ success: boolean; output: string; error?: string; exitCode: number }> {
   return new Promise((resolve) => {
     const fullCommand = `terraform ${command} ${args.join(' ')}`
@@ -65,7 +97,8 @@ function executeTerraformCommand(
     
     const terraform = spawn('terraform', [command, ...args], {
       cwd: workingDirectory,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: env || process.env
     })
 
     let output = ''
@@ -91,11 +124,11 @@ function executeTerraformCommand(
         outputLength: output.length,
         errorLength: error.length
       })
-      
+
       resolve({
         success: code === 0,
         output,
-        error: error || undefined,
+        error: error || (code !== 0 ? `Terraform exited with code ${code}` : undefined),
         exitCode: code || 1
       })
     })
